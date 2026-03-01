@@ -1,4 +1,3 @@
-import streamlit as st
 import pandas as pd
 import os
 from fpdf import FPDF
@@ -11,9 +10,14 @@ class MaldarizziPDF(FPDF):
         self.set_fill_color(0, 0, 0)
         self.rect(0, 0, 210, 40, 'F')
         
+        # Linea sottile estetica Grigio Argento sotto la fascia
+        self.set_draw_color(200, 200, 200)
+        self.set_line_width(0.5)
+        self.line(0, 40, 210, 40)
+        
         # Logo Maldarizzi al Centro della fascia
         if os.path.exists("logo.png"):
-            # Centriamo il logo: (210mm larghezza pagina - 60mm larghezza logo) / 2 = 75mm
+            # Centriamo il logo: (210mm - 60mm) / 2 = 75mm
             self.image("logo.png", 75, 10, 60)
         self.ln(45)
 
@@ -50,16 +54,16 @@ df.columns = df.columns.str.strip()
 # Info Consulente
 st.sidebar.header("🤵 Consulente")
 nome_cons = st.sidebar.text_input("Nome", "CAMILLO VASIENTI")
-tel_cons = st.sidebar.text_input("Tel/WhatsApp", "080 5322212")
+tel_cons = st.sidebar.text_input("WhatsApp (es. 39347...)", "080 5322212")
 email_cons = st.sidebar.text_input("Email", "c.vasienti@maldarizzi.com")
 
 # --- INTERFACCIA UTENTE ---
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("👤 Cliente")
+    st.subheader("📋 Cliente")
     nome_cliente = st.text_input("Nome Cliente", "Gentile Cliente")
     consegna = st.radio("Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"], horizontal=True)
-    note_libere = st.text_area("Note aggiuntive", placeholder="Optional inclusi, colore, ecc...")
+    note_libere = st.text_area("Note aggiuntive", placeholder="Accessori, colore, pacchetti inclusi...")
 
 with col2:
     st.subheader("🚘 Veicolo")
@@ -90,11 +94,9 @@ with n3: durata = st.selectbox("Mesi", [24, 36, 48, 60], index=1)
 with n4: km = st.number_input("Km/Anno", value=15000)
 
 # --- GENERAZIONE PDF ---
-if st.button("📝 GENERA PREVENTIVO LIGHT-MODERN"):
+if st.button("✨ GENERA E FAI PIOVERE AUTO"):
     pdf = MaldarizziPDF()
     pdf.add_page()
-    
-    # Testo del corpo in Nero (perché lo sfondo è bianco)
     pdf.set_text_color(0, 0, 0)
     
     # Data e Luogo
@@ -106,13 +108,13 @@ if st.button("📝 GENERA PREVENTIVO LIGHT-MODERN"):
     pdf.cell(0, 10, f"SPETT.LE {nome_cliente.upper()}", ln=True)
     pdf.ln(5)
 
-    # Immagine Auto (con bordo grigio sottile)
+    # Immagine Auto
     foto_path = None
     if foto_manuale:
         with open("tmp.png", "wb") as f: f.write(foto_manuale.getbuffer())
         foto_path = "tmp.png"
     else:
-        for ext in [".jpg", ".png", ".jpeg"]:
+        for ext in [".jpg", ".png", ".jpeg", ".JPG"]:
             p = f"foto_vetture/{marca.upper()}{ext}"
             if os.path.exists(p): foto_path = p; break
 
@@ -154,7 +156,6 @@ if st.button("📝 GENERA PREVENTIVO LIGHT-MODERN"):
     ]
     if infort: servizi.append("• Assicurazione Infortunio Conducente")
     
-    # Layout a due colonne per i servizi
     y_serv = pdf.get_y()
     for i, s in enumerate(servizi):
         if i < 4:
@@ -164,15 +165,14 @@ if st.button("📝 GENERA PREVENTIVO LIGHT-MODERN"):
             pdf.set_x(110)
             pdf.cell(90, 7, s, ln=True)
 
-    # Box Economico (Fascia Nera con Testo Bianco per il prezzo)
+    # Box Economico
     pdf.set_y(230)
     pdf.set_fill_color(0, 0, 0)
-    pdf.rect(10, 230, 190, 25, 'F') # Rettangolo nero interno
+    pdf.rect(10, 230, 190, 25, 'F')
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", "B", 22)
     pdf.cell(0, 25, f"CANONE: EURO {canone},00 / MESE + IVA", ln=True, align="C")
     
-    # Riepilogo sotto il box
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", "B", 12)
     pdf.ln(2)
@@ -187,6 +187,30 @@ if st.button("📝 GENERA PREVENTIVO LIGHT-MODERN"):
     pdf.cell(0, 5, f"E-mail: {email_cons}", ln=True, align="C")
 
     pdf.output("preventivo.pdf")
+
+    # --- EFFETTO PIOGGIA DI MACCHINE ---
+    st.markdown(
+        """
+        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
+            <style>
+                @keyframes fall {
+                    0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+                    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+                }
+                .car {
+                    position: absolute;
+                    font-size: 40px;
+                    animation: fall linear forwards;
+                }
+            </style>
+            """ + "".join([
+                f'<div class="car" style="left: {i*7}%; animation-duration: {1.5 + (i%2)}s; animation-delay: {i*0.1}s;">{"🚗" if i%2==0 else "🚙"}</div>'
+                for i in range(15)
+            ]) + """
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     with open("preventivo.pdf", "rb") as f:
-        st.download_button("📩 SCARICA PREVENTIVO", f, f"Preventivo_{modello}.pdf")
-    st.balloons()
+        st.download_button("📩 SCARICA IL TUO PREVENTIVO", f, f"Offerta_{modello}.pdf")
