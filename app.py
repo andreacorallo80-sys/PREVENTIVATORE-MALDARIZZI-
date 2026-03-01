@@ -160,4 +160,22 @@ if st.button("🚀 GENERA PREVENTIVO"):
         pdf.set_font("Arial", "B", 12)
         pdf.ln(2)
         # Calcolo km totali e rimosso simbolo €
-        km
+        km_tot = int(km_anno * durata / 12)
+        pdf.cell(0, 8, f"Anticipo: Euro {anticipo} | Durata: {durata} mesi | Km totali: {km_tot:,}".replace(",", "."), ln=True, align="C")
+
+        pdf.set_y(260)
+        pdf.set_x(120)
+        pdf.set_font("Arial", "B", 10)
+        pdf.cell(0, 5, f"Consulente: {nome_cons}", ln=True)
+        pdf.set_x(120)
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(0, 5, f"Email: {email_cons}", ln=True)
+        pdf.set_x(120)
+        pdf.cell(0, 5, f"WhatsApp/Tel: {tel_cons}", ln=True)
+
+        pdf.output("preventivo.pdf")
+        with open("preventivo.pdf", "rb") as f:
+            st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{modello}.pdf")
+            
+    except Exception as e:
+        st.error(f"Errore nella generazione del PDF: {e}")
