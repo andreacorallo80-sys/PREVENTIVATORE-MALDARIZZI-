@@ -4,202 +4,189 @@ import os
 from fpdf import FPDF
 from datetime import datetime
 
-# --- CLASSE PDF PROFESSIONALE PREMIUM BLACK ---
+# --- CLASSE PDF MODERNA: FASCIA NERA + CORPO BIANCO ---
 class MaldarizziPDF(FPDF):
     def header(self):
-        # Sfondo Nero integrale per tutta la pagina
+        # Fascia Nera Superiore
         self.set_fill_color(0, 0, 0)
-        self.rect(0, 0, 210, 297, 'F')
+        self.rect(0, 0, 210, 40, 'F')
         
-        # Logo Maldarizzi in alto a sinistra
+        # Logo Maldarizzi al Centro della fascia
         if os.path.exists("logo.png"):
-            self.image("logo.png", 12, 12, 55)
-        
-        # Linea sottile estetica Grigio Argento
-        self.set_draw_color(200, 200, 200)
-        self.set_line_width(0.3)
-        self.line(10, 35, 200, 35)
-        self.ln(38)
+            # Centriamo il logo: (210mm larghezza pagina - 60mm larghezza logo) / 2 = 75mm
+            self.image("logo.png", 75, 10, 60)
+        self.ln(45)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Arial", "I", 8)
-        self.set_text_color(120, 120, 120)
-        self.cell(0, 10, "maldarizzi.com | Offerta soggetta ad approvazione della società di noleggio", 0, 0, "C")
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, "maldarizzi.com | Offerta soggetta ad approvazione", 0, 0, "C")
 
-# --- CONFIGURAZIONE INTERFACCIA STREAMLIT ---
+# --- APP STREAMLIT ---
 st.set_page_config(page_title="Maldarizzi Rent Pro", layout="wide")
-st.title("🚀 Maldarizzi Rent - Designer di Preventivi")
+st.title("🚗 Designer di Preventivi Maldarizzi")
 
 NOME_FILE_FISSO = "dati.xlsx"
 
-# Gestione Caricamento Listino
-st.sidebar.header("📁 Gestione Database")
+# Sidebar Gestione
+st.sidebar.header("📁 Database")
 uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
 if uploaded_excel:
     with open(NOME_FILE_FISSO, "wb") as f:
         f.write(uploaded_excel.getbuffer())
-    st.sidebar.success("Database aggiornato!")
+    st.sidebar.success("Dati aggiornati!")
 
 if not os.path.exists(NOME_FILE_FISSO):
-    st.error("Carica il file dati.xlsx per iniziare!")
+    st.error("Manca il file dati.xlsx!")
     st.stop()
 
-# Caricamento Excel
+# Caricamento Dati
 excel = pd.ExcelFile(NOME_FILE_FISSO)
-foglio = st.sidebar.selectbox("Scegli Categoria", excel.sheet_names)
+foglio = st.sidebar.selectbox("Categoria", excel.sheet_names)
 df = pd.read_excel(NOME_FILE_FISSO, sheet_name=foglio, dtype=str)
 df.columns = df.columns.str.strip()
 
-# Dati Consulente
-st.sidebar.header("🤵 Info Consulente")
+# Info Consulente
+st.sidebar.header("🤵 Consulente")
 nome_cons = st.sidebar.text_input("Nome", "CAMILLO VASIENTI")
+tel_cons = st.sidebar.text_input("Tel/WhatsApp", "080 5322212")
 email_cons = st.sidebar.text_input("Email", "c.vasienti@maldarizzi.com")
-tel_cons = st.sidebar.text_input("WhatsApp/Tel", "080 5322212")
 
-# --- INTERFACCIA INPUT ---
+# --- INTERFACCIA UTENTE ---
 col1, col2 = st.columns(2)
 with col1:
-    st.subheader("📋 Cliente e Note")
+    st.subheader("👤 Cliente")
     nome_cliente = st.text_input("Nome Cliente", "Gentile Cliente")
-    consegna = st.radio("Luogo di Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"], horizontal=True)
-    note_libere = st.text_area("Note e Accessori (compariranno nel PDF)", placeholder="Es. Vernice Metallizzata, Pacchetto assistenza...")
+    consegna = st.radio("Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"], horizontal=True)
+    note_libere = st.text_area("Note aggiuntive", placeholder="Optional inclusi, colore, ecc...")
 
 with col2:
-    st.subheader("🚘 Selezione Veicolo")
+    st.subheader("🚘 Veicolo")
     marca = st.selectbox("Marca", sorted(df['Brand Description'].unique()))
     modello = st.selectbox("Modello", sorted(df[df['Brand Description']==marca]['Vehicle Set description'].unique()))
     versione = st.selectbox("Allestimento", sorted(df[(df['Brand Description']==marca) & (df['Vehicle Set description']==modello)]['Jato Product Description'].unique()))
-    foto_manuale = st.file_uploader("Sostituisci foto auto", type=["jpg", "png", "jpeg"])
+    foto_manuale = st.file_uploader("Cambia Foto Auto", type=["jpg", "png", "jpeg"])
 
 st.markdown("---")
-st.subheader("🛡️ Servizi e Penali")
+st.subheader("🛡️ Servizi")
 s1, s2, s3 = st.columns(3)
 with s1:
-    penale_rca = st.selectbox("Penale RCA (Euro)", ["0", "250"])
-    penale_if = st.selectbox("Penale Incendio/Furto", ["0", "250", "500", "5%", "10%", "20%"])
+    p_rca = st.selectbox("Penale RCA (Euro)", ["0", "250"])
+    p_if = st.selectbox("Penale Incendio/Furto", ["0", "250", "500", "5%", "10%"])
 with s2:
-    penale_kasko = st.selectbox("Penale Kasko/Danni (Euro)", ["0", "250", "500", "1000", "2000"])
-    infortunio = st.checkbox("Infortunio Conducente", value=True)
+    p_kasko = st.selectbox("Penale Danni (Euro)", ["0", "250", "500", "1000"])
+    infort = st.checkbox("Infortunio Conducente", value=True)
 with s3:
-    tipo_gomme = st.radio("Servizio Pneumatici", ["ILLIMITATI", "A NUMERO"], horizontal=True)
-    num_gomme = st.number_input("Quantità gomme", value=4) if tipo_gomme == "A NUMERO" else "ILLIMITATI"
+    g_tipo = st.radio("Pneumatici", ["ILLIMITATI", "A NUMERO"], horizontal=True)
+    g_num = st.number_input("N. gomme", 4) if g_tipo == "A NUMERO" else "ILLIMITATI"
 
 st.markdown("---")
-st.subheader("💰 Parametri Noleggio")
+st.subheader("💰 Offerta")
 n1, n2, n3, n4 = st.columns(4)
-with n1: canone = st.number_input("Canone (Euro/mese + IVA)", value=500)
+with n1: canone = st.number_input("Canone (Euro)", value=500)
 with n2: anticipo = st.number_input("Anticipo (Euro)", value=0)
-with n3: durata = st.selectbox("Durata (Mesi)", [24, 36, 48, 60], index=1)
-with n4: km_anno = st.number_input("Chilometri/Anno", value=15000)
+with n3: durata = st.selectbox("Mesi", [24, 36, 48, 60], index=1)
+with n4: km = st.number_input("Km/Anno", value=15000)
 
-# --- LOGICA GENERAZIONE PDF ---
-if st.button("🌟 GENERA PREVENTIVO PREMIUM"):
-    try:
-        pdf = MaldarizziPDF()
-        pdf.add_page()
-        pdf.set_text_color(255, 255, 255)
-        
-        # Data e Consegna (Allineato a Destra)
-        pdf.set_font("Arial", "", 10)
-        pdf.cell(0, 10, f"DATA: {datetime.now().strftime('%d/%m/%Y')} | CONSEGNA: {consegna}", ln=True, align="R")
-        
-        # Intestazione Spettabile
-        pdf.set_font("Arial", "B", 14)
-        pdf.cell(0, 10, f"SPETT.LE {nome_cliente.upper()}", ln=True)
+# --- GENERAZIONE PDF ---
+if st.button("📝 GENERA PREVENTIVO LIGHT-MODERN"):
+    pdf = MaldarizziPDF()
+    pdf.add_page()
+    
+    # Testo del corpo in Nero (perché lo sfondo è bianco)
+    pdf.set_text_color(0, 0, 0)
+    
+    # Data e Luogo
+    pdf.set_font("Arial", "", 9)
+    pdf.cell(0, 10, f"DATA: {datetime.now().strftime('%d/%m/%Y')} | CONSEGNA: {consegna}", ln=True, align="R")
+    
+    # Destinatario
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, f"SPETT.LE {nome_cliente.upper()}", ln=True)
+    pdf.ln(5)
+
+    # Immagine Auto (con bordo grigio sottile)
+    foto_path = None
+    if foto_manuale:
+        with open("tmp.png", "wb") as f: f.write(foto_manuale.getbuffer())
+        foto_path = "tmp.png"
+    else:
+        for ext in [".jpg", ".png", ".jpeg"]:
+            p = f"foto_vetture/{marca.upper()}{ext}"
+            if os.path.exists(p): foto_path = p; break
+
+    if foto_path:
+        pdf.image(foto_path, 10, 75, 120)
+        pdf.set_y(155)
+    else:
+        pdf.ln(10)
+
+    # Dettagli Auto
+    pdf.set_font("Arial", "B", 24)
+    pdf.cell(0, 15, f"{marca} {modello}".upper(), ln=True)
+    pdf.set_font("Arial", "", 12)
+    pdf.set_text_color(80, 80, 80)
+    pdf.multi_cell(0, 6, versione)
+    
+    if note_libere:
+        pdf.ln(2)
         pdf.set_font("Arial", "I", 10)
-        pdf.multi_cell(0, 5, "Di seguito l'offerta personalizzata Maldarizzi Rent per il noleggio della sua nuova vettura.")
+        pdf.multi_cell(0, 5, f"Note: {note_libere}")
 
-        # Gestione Immagine
-        foto_da_usare = None
-        if foto_manuale:
-            with open("temp_foto.png", "wb") as f: f.write(foto_manuale.getbuffer())
-            foto_da_usare = "temp_foto.png"
+    # Servizi
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 8, "SERVIZI INCLUSI NELL'OFFERTA:", ln=True)
+    pdf.set_draw_color(0, 0, 0)
+    pdf.line(10, pdf.get_y(), 60, pdf.get_y())
+    pdf.ln(4)
+
+    pdf.set_font("Arial", "", 11)
+    servizi = [
+        f"• Assicurazione RCA (Penale Euro {p_rca})",
+        f"• Incendio e Furto (Penale {p_if})",
+        f"• Copertura Danni/Kasko (Penale Euro {p_kasko})",
+        f"• Manutenzione Ordinaria e Straordinaria Inclusa",
+        f"• Gestione Pneumatici: {g_num}",
+        f"• Soccorso Stradale e Traino H24"
+    ]
+    if infort: servizi.append("• Assicurazione Infortunio Conducente")
+    
+    # Layout a due colonne per i servizi
+    y_serv = pdf.get_y()
+    for i, s in enumerate(servizi):
+        if i < 4:
+            pdf.cell(90, 7, s, ln=True)
         else:
-            for ext in [".jpg", ".png", ".jpeg", ".JPG", ".PNG"]:
-                path = f"foto_vetture/{marca.upper()}{ext}"
-                if os.path.exists(path):
-                    foto_da_usare = path
-                    break
+            if i == 4: pdf.set_xy(110, y_serv)
+            pdf.set_x(110)
+            pdf.cell(90, 7, s, ln=True)
 
-        if foto_da_usare:
-            pdf.image(foto_da_usare, 10, 75, 115)
-            pdf.set_y(150) # Sposta il testo sotto la foto
-        else:
-            pdf.ln(10)
+    # Box Economico (Fascia Nera con Testo Bianco per il prezzo)
+    pdf.set_y(230)
+    pdf.set_fill_color(0, 0, 0)
+    pdf.rect(10, 230, 190, 25, 'F') # Rettangolo nero interno
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", "B", 22)
+    pdf.cell(0, 25, f"CANONE: EURO {canone},00 / MESE + IVA", ln=True, align="C")
+    
+    # Riepilogo sotto il box
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", "B", 12)
+    pdf.ln(2)
+    km_tot = int(km * durata / 12)
+    pdf.cell(0, 8, f"Anticipo: Euro {anticipo}  |  Durata: {durata} Mesi  |  Km Totali: {km_tot:,}".replace(",", "."), ln=True, align="C")
 
-        # Titolo Veicolo (Grande e Impattante)
-        pdf.set_font("Arial", "B", 26)
-        pdf.cell(0, 15, f"{marca} {modello}".upper(), ln=True)
-        pdf.set_font("Arial", "", 13)
-        pdf.set_text_color(200, 200, 200) # Grigio chiaro per versione
-        pdf.multi_cell(0, 6, versione)
-        
-        # Note Libere
-        if note_libere:
-            pdf.ln(4)
-            pdf.set_font("Arial", "I", 10)
-            pdf.set_text_color(160, 160, 160)
-            pdf.multi_cell(0, 5, f"Dettagli aggiuntivi inclusi: {note_libere}")
-            pdf.set_text_color(255, 255, 255)
+    # Footer Consulente
+    pdf.set_y(265)
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(0, 5, f"Consulente: {nome_cons} | Tel: {tel_cons}", ln=True, align="C")
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(0, 5, f"E-mail: {email_cons}", ln=True, align="C")
 
-        # Blocco Servizi (Disposti su 2 colonne per eleganza)
-        pdf.ln(8)
-        pdf.set_font("Arial", "B", 12)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(0, 10, "SERVIZI INCLUSI E PENALI", ln=True)
-        pdf.set_draw_color(100, 100, 100)
-        pdf.line(10, pdf.get_y(), 100, pdf.get_y()) # Linea di separazione servizi
-        pdf.ln(3)
-
-        pdf.set_font("Arial", "", 10)
-        servizi_txt = [
-            f"• RCA: Penale Euro {penale_rca}",
-            f"• Incendio e Furto: Penale {penale_if}",
-            f"• Kasko (Danni): Penale Euro {penale_kasko}",
-            f"• Pneumatici: {num_gomme}",
-            "• Manutenzione Ordinaria/Straordinaria",
-            "• Soccorso Stradale 24h"
-        ]
-        if infortunio: servizi_txt.append("• Infortunio Conducente")
-
-        # Scrittura su due colonne
-        y_start = pdf.get_y()
-        for i, s in enumerate(servizi_txt):
-            if i < 4:
-                pdf.cell(90, 6, s, ln=True)
-            else:
-                if i == 4: pdf.set_xy(110, y_start)
-                pdf.set_x(110)
-                pdf.cell(90, 6, s, ln=True)
-
-        # Box Prezzo (Massimo Contrasto)
-        pdf.set_y(230)
-        pdf.set_fill_color(255, 255, 255) # Sfondo Bianco
-        pdf.set_text_color(0, 0, 0) # Testo Nero
-        pdf.set_font("Arial", "B", 24)
-        pdf.cell(0, 22, f" EURO {canone},00 / MESE + IVA ", ln=True, fill=True, align="C")
-        
-        # Dati Finanziari di Riepilogo
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Arial", "B", 13)
-        pdf.ln(3)
-        km_tot = int(km_anno * durata / 12)
-        pdf.cell(0, 8, f"Anticipo: Euro {anticipo}  |  Durata: {durata} Mesi  |  Km Totali: {km_tot:,}".replace(",", "."), ln=True, align="C")
-
-        # Footer con Contatti Consulente
-        pdf.set_y(265)
-        pdf.set_font("Arial", "B", 10)
-        pdf.set_text_color(200, 200, 200)
-        pdf.cell(0, 5, f"Consulente: {nome_cons}  |  Tel: {tel_cons}", ln=True, align="C")
-        pdf.set_font("Arial", "", 10)
-        pdf.cell(0, 5, f"Email: {email_cons}", ln=True, align="C")
-
-        # Output e Download
-        pdf.output("preventivo.pdf")
-        with open("preventivo.pdf", "rb") as f:
-            st.download_button("📩 SCARICA PREVENTIVO PRONTO", f, f"Offerta_{modello}.pdf")
-        st.balloons()
-            
-    except Exception as e:
-        st.error(f"Errore nella generazione del PDF: {e}")
+    pdf.output("preventivo.pdf")
+    with open("preventivo.pdf", "rb") as f:
+        st.download_button("📩 SCARICA PREVENTIVO", f, f"Preventivo_{modello}.pdf")
+    st.balloons()
