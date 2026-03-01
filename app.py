@@ -30,7 +30,7 @@ class MaldarizziPDF(FPDF):
 
 # --- APP INTERFACCIA ---
 st.set_page_config(page_title="Maldarizzi Rent Pro", layout="wide")
-st.title("🚗 Generazione Preventivi Professionali")
+st.title("🚗🚀 NUOVO PORTALE MALDARIZZI 2026")
 
 NOME_FILE_FISSO = "dati.xlsx"
 
@@ -205,3 +205,4 @@ if st.button("📝 CREA PREVENTIVO PREMIUM"):
 
     with open("preventivo.pdf", "rb") as f:
         st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{modello}.pdf")
+
