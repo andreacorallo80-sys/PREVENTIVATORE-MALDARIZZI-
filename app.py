@@ -4,7 +4,7 @@ import os
 from fpdf import FPDF
 from datetime import datetime
 
-# --- CLASSE PDF PROFESSIONALE BLACK EDITION ---
+# --- CLASSE PDF PROFESSIONALE ---
 class MaldarizziPDF(FPDF):
     def header(self):
         self.set_fill_color(0, 0, 0)
@@ -17,40 +17,31 @@ class MaldarizziPDF(FPDF):
         self.set_y(-15)
         self.set_font("Arial", "I", 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, "https://noleggio.maldarizzi.com/ - Documento ad uso interno commerciale", 0, 0, "C")
+        self.cell(0, 10, "https://noleggio.maldarizzi.com/ - Offerta soggetta ad approvazione", 0, 0, "C")
 
 # --- APP STREAMLIT ---
 st.set_page_config(page_title="Maldarizzi Rent - Pro", layout="wide")
-st.title("🚀 Maldarizzi Rent - Preventivatore Professionale")
+st.title("🚗 Maldarizzi Rent - Area Commerciale")
 
-# --- GESTIONE FILE MODELLI (AGGIORNABILE) ---
-st.sidebar.header("📁 Gestione Database")
-uploaded_file = st.sidebar.file_uploader("Aggiorna listino Excel", type=["xlsx"])
 NOME_FILE_FISSO = "dati.xlsx"
 
-if uploaded_file is not None:
-    with open(NOME_FILE_FISSO, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    st.sidebar.success("Database aggiornato!")
-
-if not os.path.exists(NOME_FILE_FISSO):
-    st.error("Carica il file dati.xlsx per iniziare.")
-    st.stop()
-
 # Caricamento Dati
-excel = pd.ExcelFile(NOME_FILE_FISSO)
-foglio = st.sidebar.selectbox("Categoria", excel.sheet_names)
-df = pd.read_excel(NOME_FILE_FISSO, sheet_name=foglio, dtype=str)
-df.columns = df.columns.str.strip()
+if os.path.exists(NOME_FILE_FISSO):
+    excel = pd.ExcelFile(NOME_FILE_FISSO)
+    foglio = st.sidebar.selectbox("Categoria", excel.sheet_names)
+    df = pd.read_excel(NOME_FILE_FISSO, sheet_name=foglio, dtype=str)
+    df.columns = df.columns.str.strip()
+else:
+    st.error("Carica il file dati.xlsx su GitHub!")
+    st.stop()
 
 # --- INPUT COMMERCIALI ---
 st.sidebar.header("🤵 Consulente")
 nome_cons = st.sidebar.text_input("Nome", "CAMILLO VASIENTI")
 email_cons = st.sidebar.text_input("Email", "c.vasienti@maldarizzi.com")
 
-# --- LAYOUT PRINCIPALE ---
+# --- LAYOUT SELEZIONE AUTO E CLIENTE ---
 col1, col2 = st.columns(2)
-
 with col1:
     st.subheader("📋 Cliente e Consegna")
     nome_cliente = st.text_input("Nome Cliente", "Gentile Cliente")
@@ -64,14 +55,22 @@ with col2:
     versione = st.selectbox("Allestimento", sorted(df[(df['Brand Description']==marca) & (df['Vehicle Set description']==modello)]['Jato Product Description'].unique()))
 
 st.markdown("---")
+
+# --- NUOVA SEZIONE SERVIZI E GOMME ---
 st.subheader("🛡️ Servizi e Penali")
 s1, s2, s3 = st.columns(3)
 with s1:
     penale_rca = st.selectbox("Penale RCA (€)", ["0", "250"])
-with s2:
     penale_if = st.selectbox("Penale Incendio/Furto", ["0", "250", "500", "0%", "5%", "10%", "20%"])
-with s3:
+with s2:
     penale_kasko = st.selectbox("Penale Kasko (Danni) (€)", ["0", "250", "500", "1000", "2000"])
+    infortunio = st.checkbox("Infortunio Conducente", value=True)
+with s3:
+    tipo_gomme = st.radio("Servizio Gomme", ["ILLIMITATO", "A NUMERO"])
+    if tipo_gomme == "A NUMERO":
+        num_gomme = st.number_input("Numero esatto gomme", value=4, step=2)
+    else:
+        num_gomme = "ILLIMITATE"
 
 st.markdown("---")
 st.subheader("💰 Parametri Noleggio")
@@ -126,8 +125,16 @@ if st.button("✨ GENERA PREVENTIVO BLACK"):
         pdf.cell(0, 7, f"- RCA: Penale Euro {penale_rca}", ln=True)
         pdf.cell(0, 7, f"- Incendio e Furto: Penale {penale_if}", ln=True)
         pdf.cell(0, 7, f"- Protezione Danni (Kasko): Penale Euro {penale_kasko}", ln=True)
+        
+        # Gestione Gomme nel PDF
+        testo_gomme = f"- Servizio Gomme: {num_gomme}"
+        pdf.cell(0, 7, testo_gomme, ln=True)
+        
         pdf.cell(0, 7, "- Manutenzione Ordinaria e Straordinaria: INCLUSA", ln=True)
         pdf.cell(0, 7, "- Traino e Assistenza Stradale 24h: INCLUSA", ln=True)
+        
+        if infortunio:
+            pdf.cell(0, 7, "- Infortunio Conducente: INCLUSO", ln=True)
         
         # Box Economico
         pdf.set_y(230)
