@@ -4,7 +4,7 @@ import os
 from fpdf import FPDF
 from datetime import datetime
 
-# --- CLASSE PDF: DESIGN REVISIONATO ---
+# --- CLASSE PDF PREMIUM: FASCIA NERA + LOGO CENTRATO ---
 class MaldarizziPDF(FPDF):
     def header(self):
         # Fascia Nera Superiore Alta
@@ -16,9 +16,8 @@ class MaldarizziPDF(FPDF):
         self.set_line_width(0.8)
         self.line(0, 45, 210, 45)
         
-        # Logo Maldarizzi - CENTRATO E GRANDE
+        # Logo Maldarizzi - CENTRATO
         if os.path.exists("logo.png"):
-            # Centratura: (210mm - 70mm larghezza logo) / 2 = 70
             self.image("logo.png", 70, 10, 70)
         self.ln(50)
 
@@ -34,7 +33,7 @@ st.title("🚗🚀 NUOVO PORTALE MALDARIZZI 2026")
 
 NOME_FILE_FISSO = "dati.xlsx"
 
-# Sidebar Caricamento Listino
+# Sidebar Gestione
 st.sidebar.header("📁 Gestione Database")
 uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
 if uploaded_excel:
@@ -64,14 +63,14 @@ with col1:
     st.subheader("📋 Cliente")
     nome_cliente = st.text_input("Nome Cliente", "Gentile Cliente")
     consegna = st.radio("Luogo di Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"], horizontal=True)
-    note_libere = st.text_area("Note aggiuntive (Optional, pacchetti...)", height=100)
+    note_libere = st.text_area("Note aggiuntive", height=100)
 
 with col2:
     st.subheader("🚘 Veicolo")
     marca = st.selectbox("Marca", sorted(df['Brand Description'].unique()))
     modello = st.selectbox("Modello", sorted(df[df['Brand Description']==marca]['Vehicle Set description'].unique()))
     versione = st.selectbox("Allestimento", sorted(df[(df['Brand Description']==marca) & (df['Vehicle Set description']==modello)]['Jato Product Description'].unique()))
-    foto_manuale = st.file_uploader("Carica foto auto specifica", type=["jpg", "png", "jpeg"])
+    foto_manuale = st.file_uploader("Carica foto auto", type=["jpg", "png", "jpeg"])
 
 st.markdown("---")
 st.subheader("🛡️ Servizi")
@@ -96,113 +95,119 @@ with n4: km = st.number_input("Km/Anno", value=15000)
 
 # --- GENERAZIONE PDF ---
 if st.button("📝 CREA PREVENTIVO PREMIUM"):
-    pdf = MaldarizziPDF()
-    pdf.add_page()
-    pdf.set_text_color(0, 0, 0)
-    
-    # Data a destra
-    pdf.set_font("Arial", "", 9)
-    pdf.cell(0, 10, f"DATA: {datetime.now().strftime('%d/%m/%Y')} | CONSEGNA: {consegna}", ln=True, align="R")
-    
-    # Destinatario
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, f"SPETT.LE {nome_cliente.upper()}", ln=True)
-    pdf.ln(5)
-
-    # Gestione Foto
-    foto_path = None
-    if foto_manuale:
-        with open("tmp.png", "wb") as f: f.write(foto_manuale.getbuffer())
-        foto_path = "tmp.png"
-    else:
-        for ext in [".jpg", ".png", ".jpeg", ".JPG"]:
-            p = f"foto_vetture/{marca.upper()}{ext}"
-            if os.path.exists(p): foto_path = p; break
-
-    if foto_path:
-        pdf.image(foto_path, 10, 80, 130)
-        pdf.set_y(175)
-    else:
-        pdf.ln(15)
-
-    # Testi Auto
-    pdf.set_font("Arial", "B", 26)
-    pdf.cell(0, 15, f"{marca} {modello}".upper(), ln=True)
-    pdf.set_font("Arial", "", 13)
-    pdf.set_text_color(80, 80, 80)
-    pdf.multi_cell(0, 6, versione)
-    
-    if note_libere:
+    try:
+        pdf = MaldarizziPDF()
+        pdf.add_page()
+        pdf.set_text_color(0, 0, 0)
+        
+        pdf.set_font("Arial", "", 9)
+        pdf.cell(0, 10, f"DATA: {datetime.now().strftime('%d/%m/%Y')} | CONSEGNA: {consegna}", ln=True, align="R")
+        
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 10, f"SPETT.LE {nome_cliente.upper()}", ln=True)
         pdf.ln(5)
-        pdf.set_font("Arial", "I", 10)
-        pdf.multi_cell(0, 5, f"Allestimento e note: {note_libere}")
 
-    # Servizi
-    pdf.ln(10)
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 8, "DETTAGLIO SERVIZI INCLUSI:", ln=True)
-    pdf.set_draw_color(0, 0, 0)
-    pdf.line(10, pdf.get_y(), 60, pdf.get_y())
-    pdf.ln(5)
-
-    pdf.set_font("Arial", "", 11)
-    servizi = [
-        f"• Assicurazione RCA (Penale Euro {p_rca})",
-        f"• Incendio e Furto (Penale {p_if})",
-        f"• Copertura Danni/Kasko (Penale Euro {p_kasko})",
-        f"• Pneumatici: {g_num}",
-        "• Manutenzione Totale (Ord/Straord)",
-        "• Assistenza Stradale H24"
-    ]
-    if infort: servizi.append("• Infortunio Conducente Incluso")
-    
-    y_serv = pdf.get_y()
-    for i, s in enumerate(servizi):
-        if i < 4:
-            pdf.cell(90, 7, s, ln=True)
+        # Foto Auto
+        foto_path = None
+        if foto_manuale:
+            with open("tmp.png", "wb") as f: f.write(foto_manuale.getbuffer())
+            foto_path = "tmp.png"
         else:
-            if i == 4: pdf.set_xy(110, y_serv)
-            pdf.set_x(110)
-            pdf.cell(90, 7, s, ln=True)
+            for ext in [".jpg", ".png", ".jpeg", ".JPG"]:
+                p = f"foto_vetture/{marca.upper()}{ext}"
+                if os.path.exists(p): foto_path = p; break
 
-    # Box Prezzo Black
-    pdf.set_y(235)
-    pdf.set_fill_color(0, 0, 0)
-    pdf.rect(10, 235, 190, 25, 'F')
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", "B", 24)
-    pdf.cell(0, 25, f"CANONE: EURO {canone},00 / MESE + IVA", ln=True, align="C")
-    
-    # Riepilogo Finanziario
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "B", 13)
-    pdf.ln(4)
-    km_tot = int(km * durata / 12)
-    pdf.cell(0, 8, f"Anticipo: Euro {anticipo}  |  Durata: {durata} Mesi  |  Km Totali: {km_tot:,}".replace(",", "."), ln=True, align="C")
+        if foto_path:
+            pdf.image(foto_path, 10, 80, 125)
+            pdf.set_y(175)
+        else:
+            pdf.ln(15)
 
-    # Footer Consulente
-    pdf.set_y(270)
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, 5, f"{nome_cons} | Tel: {tel_cons}", ln=True, align="C")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(0, 5, email_cons, ln=True, align="C")
+        # Testi Auto
+        pdf.set_font("Arial", "B", 26)
+        pdf.cell(0, 15, f"{marca} {modello}".upper(), ln=True)
+        pdf.set_font("Arial", "", 13)
+        pdf.set_text_color(80, 80, 80)
+        pdf.multi_cell(0, 6, versione)
+        
+        if note_libere:
+            pdf.ln(5)
+            pdf.set_font("Arial", "I", 10)
+            pdf.multi_cell(0, 5, f"Allestimento e note: {note_libere}")
 
-    pdf.output("preventivo.pdf")
+        # Servizi (PULIZIA SIMBOLI EURO)
+        pdf.ln(10)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 8, "DETTAGLIO SERVIZI INCLUSI:", ln=True)
+        pdf.set_draw_color(0, 0, 0)
+        pdf.line(10, pdf.get_y(), 60, pdf.get_y())
+        pdf.ln(5)
 
-    # --- PIOGGIA DI AUTO ---
-    st.markdown("""
-        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
-            <style>
-                @keyframes fall {
-                    0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-                    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-                }
-                .car { position: absolute; font-size: 40px; animation: fall linear forwards; }
-            </style>
-            """ + "".join([f'<div class="car" style="left: {i*8}%; animation-duration: {1.5+(i%2)}s; animation-delay: {i*0.1}s;">🚗</div>' for i in range(12)]) + """
-        </div>""", unsafe_allow_html=True)
+        pdf.set_font("Arial", "", 11)
+        # Qui usiamo solo la parola 'Euro' per evitare il crash
+        servizi = [
+            f"- RCA: Penale Euro {p_rca}",
+            f"- Incendio e Furto: Penale {p_if}",
+            f"- Kasko (Danni): Penale Euro {p_kasko}",
+            f"- Pneumatici: {g_num}",
+            "- Manutenzione Totale (Ord/Straord)",
+            "- Assistenza Stradale H24"
+        ]
+        if infort: servizi.append("- Infortunio Conducente Incluso")
+        
+        y_serv = pdf.get_y()
+        for i, s in enumerate(servizi):
+            # Usiamo encode('latin-1', 'replace').decode('latin-1') per sicurezza
+            s_clean = s.encode('latin-1', 'replace').decode('latin-1')
+            if i < 4:
+                pdf.cell(90, 7, s_clean, ln=True)
+            else:
+                if i == 4: pdf.set_xy(110, y_serv)
+                pdf.set_x(110)
+                pdf.cell(90, 7, s_clean, ln=True)
 
-    with open("preventivo.pdf", "rb") as f:
-        st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{modello}.pdf")
+        # Box Prezzo Black
+        pdf.set_y(235)
+        pdf.set_fill_color(0, 0, 0)
+        pdf.rect(10, 235, 190, 25, 'F')
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", "B", 22)
+        pdf.cell(0, 25, f"CANONE: EURO {canone},00 / MESE + IVA", ln=True, align="C")
+        
+        # Riepilogo Finanziario
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", "B", 13)
+        pdf.ln(4)
+        km_tot = int(km * durata / 12)
+        riepilogo = f"Anticipo: Euro {anticipo}  |  Durata: {durata} Mesi  |  Km Totali: {km_tot:,}".replace(",", ".")
+        pdf.cell(0, 8, riepilogo.encode('latin-1', 'replace').decode('latin-1'), ln=True, align="C")
 
+        # Footer Consulente
+        pdf.set_y(270)
+        pdf.set_font("Arial", "B", 10)
+        footer_cons = f"{nome_cons} | Tel: {tel_cons}".encode('latin-1', 'replace').decode('latin-1')
+        pdf.cell(0, 5, footer_cons, ln=True, align="C")
+        pdf.set_font("Arial", "", 10)
+        pdf.cell(0, 5, email_cons, ln=True, align="C")
+
+        pdf.output("preventivo.pdf")
+
+        # --- PIOGGIA DI AUTO ---
+        st.markdown("""
+            <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
+                <style>
+                    @keyframes fall {
+                        0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+                        100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+                    }
+                    .car { position: absolute; font-size: 40px; animation: fall linear forwards; }
+                </style>
+                """ + "".join([f'<div class="car" style="left: {i*8}%; animation-duration: {1.5+(i%2)}s; animation-delay: {i*0.1}s;">🚗</div>' for i in range(12)]) + """
+            </div>""", unsafe_allow_html=True)
+
+        with open("preventivo.pdf", "rb") as f:
+            st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{modello}.pdf")
+
+    except Exception as e:
+        st.error(f"Errore tecnico durante la stampa: {e}")
