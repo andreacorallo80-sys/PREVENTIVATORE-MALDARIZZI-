@@ -27,7 +27,7 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CLASSE PDF "MALDARIZZI FINAL EDITION" ---
+    # --- 2. CLASSE PDF "MALDARIZZI FINAL WHITE" ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -45,6 +45,8 @@ if check_password():
             self.rect(0, 0, 210, 40, 'F')
             if os.path.exists("logo.png"):
                 self.image("logo.png", 75, 8, 60)
+            
+            # TITOLO CENTRATO SOTTO LA BARRA
             self.set_y(45)
             self.set_font(self.f_f, "B", 22)
             self.set_text_color(0, 0, 0)
@@ -53,12 +55,11 @@ if check_password():
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Pro", layout="wide")
     
-    try:
-        locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
-    except:
-        pass
+    # Tentativo data in Italiano
+    try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
+    except: pass
 
-    # Sidebar
+    # Sidebar: Database e Consulente
     st.sidebar.header("📁 Database")
     uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino", type=["xlsx"])
     if uploaded_excel:
@@ -66,7 +67,7 @@ if check_password():
         st.sidebar.success("Database aggiornato!")
 
     if not os.path.exists("dati.xlsx"):
-        st.error("Carica dati.xlsx per procedere")
+        st.error("Manca dati.xlsx")
         st.stop()
 
     excel = pd.ExcelFile("dati.xlsx")
@@ -95,22 +96,29 @@ if check_password():
     st.markdown("---")
     st.subheader("🛠️ Servizi e Penali")
     s1, s2, s3 = st.columns(3)
-    with s1: 
+    with s1:
         p_rca = st.selectbox("Penale RCA", ["0 Euro", "250 Euro", "500 Euro"])
         p_if = st.selectbox("Penale Incendio/Furto", ["0%", "5%", "10%", "250 Euro"])
-    with s2: 
+    with s2:
         p_kasko = st.selectbox("Penale Danni/Kasko", ["0 Euro", "250 Euro", "500 Euro", "1000 Euro"])
         infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
     with s3:
-        usa_g = st.checkbox("Pneumatici", value=True)
-        g_tipo = st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True) if usa_g else ""
+        # --- FIX PNEUMATICI ---
+        usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
+        g_num = "ILLIMITATE"
+        if usa_gomme:
+            g_tipo = st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True)
+            if g_tipo == "A NUMERO":
+                g_num = st.number_input("N. Gomme", value=4, min_value=1)
+        else:
+            g_num = None
 
     st.markdown("---")
     st.subheader("💸 Dati Economici")
     n1, n2, n3, n4 = st.columns(4)
     with n1: canone = st.number_input("Canone", value=500)
     with n2: anticipo = st.number_input("Anticipo", value=0)
-    with n3: durata = st.selectbox("Durata (Mesi)", [24, 36, 48, 60], index=1)
+    with n3: durata = st.selectbox("Mesi", [24, 36, 48, 60], index=1)
     with n4: km = st.number_input("Km/Anno", value=15000)
 
     # --- GENERAZIONE PDF ---
@@ -119,7 +127,7 @@ if check_password():
         pdf.add_page()
         pdf.set_text_color(0, 0, 0)
         
-        # Data Italiana
+        # Data Italiana e Intestazione
         data_it = datetime.now().strftime('%d %B %Y').upper()
         pdf.set_y(58)
         pdf.set_font(pdf.f_f, "", 9)
@@ -129,7 +137,7 @@ if check_password():
         pdf.cell(0, 8, f"SPETT.LE {nome_cliente.upper()}", align="C", ln=True)
 
         # BLOCCO VEICOLO (SX) E FOTO (DX)
-        y_pos = 80
+        y_pos = 85
         f_path = "tmp.png"
         if foto_m:
             with open(f_path, "wb") as f: f.write(foto_m.getbuffer())
@@ -160,11 +168,17 @@ if check_password():
         pdf.cell(0, 7, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
         pdf.set_font(pdf.f_f, "", 9)
         
-        servizi_txt = f"RCA (Penale {p_rca}) | Incendio e Furto (Penale {p_if}) | Danni/Kasko (Penale {p_kasko}) | Manutenzione Ordinaria/Straordinaria | Assistenza Stradale H24"
-        if usa_g: servizi_txt += f" | Pneumatici {g_tipo}"
-        if infort: servizi_txt += " | Infortunio Conducente (PAI)"
+        serv_list = [
+            f"RCA (Penale {p_rca})",
+            f"Incendio e Furto (Penale {p_if})",
+            f"Danni/Kasko (Penale {p_kasko})",
+            "Manutenzione Ordinaria/Straordinaria",
+            "Assistenza Stradale H24"
+        ]
+        if g_num: serv_list.append(f"Pneumatici: {g_num}")
+        if infort: serv_list.append("Infortunio Conducente (PAI)")
         
-        pdf.multi_cell(0, 5, servizi_txt, align="C")
+        pdf.multi_cell(0, 5, " | ".join(serv_list), align="C")
         
         # Disclaimer Foto
         pdf.ln(2)
@@ -200,7 +214,7 @@ if check_password():
         pdf.set_font(pdf.f_f, "I", 7)
         pdf.cell(0, 8, "MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/", align="C", ln=True)
 
-        pdf.output("preventivo_maldarizzi.pdf")
+        pdf.output("preventivo.pdf")
         st.success("Preventivo generato!")
-        with open("preventivo_maldarizzi.pdf", "rb") as f:
-            st.download_button("📩 SCARICA PREVENTIVO", f, f"Offerta_{marca}.pdf", key=f"dl_{datetime.now().timestamp()}")
+        with open("preventivo.pdf", "rb") as f:
+            st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{marca}.pdf", key=f"dl_{datetime.now().timestamp()}")
