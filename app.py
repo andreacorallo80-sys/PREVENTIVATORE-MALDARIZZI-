@@ -26,42 +26,43 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CLASSE PDF "RUBIK EDITION" ---
+    # --- 2. CLASSE PDF "MALDARIZZI ONE PAGE" ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
-            # Registrazione Font Rubik
-            # Assicurati di aver caricato i file .ttf su GitHub!
+            self.set_margins(10, 10, 10)
+            self.set_auto_page_break(False) # Forza la singola pagina
             if os.path.exists("Rubik-Light.ttf"):
                 self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
             if os.path.exists("Rubik-Bold.ttf"):
                 self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
-            
-            # Fallback su Arial se i file mancano
-            self.font_family = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
+            self.font_family_custom = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
+            # Sfondo nero totale come richiesto
             self.set_fill_color(0, 0, 0)
             self.rect(0, 0, 210, 297, 'F') 
-            if os.path.exists("logo.png"):
-                self.image("logo.png", 10, 8, 40)
             
-            self.set_font(self.font_family, "B", 30)
+            if os.path.exists("logo.png"):
+                self.image("logo.png", 10, 8, 45)
+            
+            # Titolo "IL TUO PREVENTIVO" a destra
+            self.set_font(self.font_family_custom, "B", 32)
             self.set_text_color(255, 255, 255)
             self.set_xy(100, 15)
-            self.multi_cell(100, 10, "IL TUO\nPREVENTIVO", align="R")
+            self.multi_cell(100, 11, "IL TUO\nPREVENTIVO", align="R")
 
         def footer(self):
             self.set_y(-12)
-            self.set_font(self.font_family, "", 7)
+            self.set_font(self.font_family_custom, "", 7)
             self.set_text_color(130, 130, 130)
-            self.cell(0, 10, "https://noleggio.maldarizzi.com/ - Offerta soggetta ad approvazione", 0, 0, "C")
+            self.cell(0, 10, "maldarizzi.com | Offerta soggetta ad approvazione", 0, 0, "C")
 
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Pro", layout="wide")
     
     st.sidebar.header("⚙️ Impostazioni Offerta")
-    giorni_validita = st.sidebar.slider("Giorni di Validità", 1, 30, 7)
+    giorni_validita = st.sidebar.slider("Giorni di Validità", 1, 30, 30)
     
     st.sidebar.markdown("---")
     uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
@@ -84,7 +85,6 @@ if check_password():
     email_cons = st.sidebar.text_input("Email", "c.vasienti@maldarizzi.com")
     tel_cons = st.sidebar.text_input("WhatsApp", "080 5322212")
 
-    # Layout Input Principale
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("👤 Cliente")
@@ -116,64 +116,62 @@ if check_password():
             g_num = st.number_input("N. Gomme", 4) if g_tipo == "A NUMERO" else "ILLIMITATI"
 
     st.markdown("---")
-    st.subheader("💰 Offerta")
     n1, n2, n3, n4 = st.columns(4)
     with n1: canone = st.number_input("Canone (Euro)", value=500)
     with n2: anticipo = st.number_input("Anticipo (Euro)", value=0)
     with n3: durata = st.selectbox("Mesi", [24, 36, 48, 60], index=1)
     with n4: km = st.number_input("Km/Anno", value=15000)
 
-    # --- GENERAZIONE PDF ---
     if st.button("✨ GENERA PREVENTIVO"):
         pdf = MaldarizziPDF()
         pdf.add_page()
-        f_fam = pdf.font_family
+        f_fam = pdf.font_family_custom
         pdf.set_text_color(255, 255, 255)
         
         # Data e Validità
         data_f = f"{datetime.now().strftime('%d %B %Y')} Validita {giorni_validita} giorni"
         pdf.set_font(f_fam, "", 10)
-        pdf.set_xy(10, 42)
+        pdf.set_xy(10, 45)
         pdf.cell(0, 10, data_f, ln=True)
         
         pdf.set_font(f_fam, "", 12)
         pdf.cell(0, 8, f"{nome_cliente.upper()},", ln=True)
-        pdf.set_font(f_fam, "", 9) # Rubik Light è già leggero
+        pdf.set_font(f_fam, "", 9) 
         pdf.multi_cell(0, 4, "di seguito trova il preventivo che meglio si adatta alle sue esigenze.")
 
-        # Foto
+        # Foto (Dimensionata per stare in una pagina)
         foto_path = None
         if foto_manuale:
             with open("tmp.png", "wb") as f: f.write(foto_manuale.getbuffer())
             foto_path = "tmp.png"
         else:
-            for ext in [".jpg", ".png", ".jpeg"]:
+            for ext in [".jpg", ".png", ".jpeg", ".JPG"]:
                 p = f"foto_vetture/{marca.upper()}{ext}"
                 if os.path.exists(p): foto_path = p; break
         
         if foto_path:
-            pdf.image(foto_path, 10, 65, 100)
-            pdf.set_y(135)
+            pdf.image(foto_path, 10, 70, 100)
+            pdf.set_y(140)
         else:
-            pdf.ln(10)
+            pdf.set_y(80)
 
         # Dati Veicolo
-        pdf.set_font(f_fam, "B", 22)
-        pdf.cell(0, 10, f"{marca} {modello}".upper(), ln=True)
-        pdf.set_font(f_fam, "", 11)
-        pdf.multi_cell(0, 5, versione)
+        pdf.set_font(f_fam, "B", 24)
+        pdf.cell(0, 12, f"{marca} {modello}".upper(), ln=True)
+        pdf.set_font(f_fam, "", 12)
+        pdf.multi_cell(0, 6, versione)
         
-        # Blocchi Tecnici
-        pdf.ln(3)
+        # Parametri Tecnici
+        pdf.ln(4)
         pdf.set_font(f_fam, "B", 11)
         pdf.cell(0, 6, f"Durata contratto: {durata} Mesi", ln=True)
         pdf.cell(0, 6, f"Km/anno: {km:,} km".replace(",", "."), ln=True)
 
-        # Servizi
-        pdf.ln(3)
-        pdf.set_font(f_fam, "B", 10)
-        pdf.cell(0, 6, "SERVIZI INCLUSI:", ln=True)
-        pdf.set_font(f_fam, "", 9)
+        # Servizi su due colonne
+        pdf.ln(4)
+        pdf.set_font(f_fam, "B", 11)
+        pdf.cell(0, 7, "SERVIZI INCLUSI:", ln=True)
+        pdf.set_font(f_fam, "", 10)
         
         serv_list = [
             f"- RCA: franchigia {p_rca}",
@@ -189,33 +187,35 @@ if check_password():
         
         y_serv = pdf.get_y()
         for i, s in enumerate(serv_list):
+            # Pulizia testo per evitare crash Unicode
+            s_clean = s.encode('latin-1', 'replace').decode('latin-1')
             if i < 4:
-                pdf.cell(90, 5, s, ln=True)
+                pdf.cell(90, 6, s_clean, ln=True)
             else:
                 if i == 4: pdf.set_xy(110, y_serv)
                 pdf.set_x(110)
-                pdf.cell(90, 5, s, ln=True)
+                pdf.cell(90, 6, s_clean, ln=True)
 
-        # Prezzo
+        # Prezzo (Box Black Style)
         pdf.set_y(225)
         pdf.set_font(f_fam, "B", 26)
-        pdf.cell(0, 12, f"Euro {canone}/mese (iva esclusa)", ln=True, align="L")
+        pdf.cell(0, 14, f"Euro {canone}/mese (iva esclusa)", ln=True, align="L")
         pdf.set_font(f_fam, "B", 16)
         pdf.cell(0, 10, f"Anticipo: Euro {anticipo}", ln=True, align="L")
 
-        # Footer
+        # Footer e Disclaimer
         pdf.set_y(255)
-        pdf.set_font(f_fam, "", 8)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(0, 5, f"TIPOLOGIA VEICOLO: {t_veicolo}", ln=True, align="R")
+        pdf.set_font(f_fam, "B", 10)
+        pdf.cell(0, 6, f"TIPOLOGIA VEICOLO: {t_veicolo.upper()}", ln=True, align="R")
         
         pdf.set_font(f_fam, "", 7)
         pdf.set_text_color(180, 180, 180)
-        pdf.multi_cell(0, 3, "Le immagini sono puramente indicative. Offerta valida salvo approvazione.")
+        pdf.multi_cell(0, 3, "Le immagini sono puramente indicative. Offerta valida salvo approvazione. I canoni possono variare in base alla quotazione della societa di noleggio al momento dell'ordine.")
 
+        # Consulente
         pdf.set_y(270)
         pdf.set_x(120)
-        pdf.set_font(f_fam, "B", 9)
+        pdf.set_font(f_fam, "B", 10)
         pdf.set_text_color(255,255,255)
         pdf.cell(0, 4, f"Consulente: {nome_cons}", ln=True)
         pdf.set_font(f_fam, "", 9)
@@ -226,7 +226,7 @@ if check_password():
 
         pdf.output("preventivo.pdf")
         
-        st.success("Preventivo Generato con Font Rubik!")
+        st.success("Preventivo Generato!")
         with open("preventivo.pdf", "rb") as f:
             st.download_button(
                 label="📩 SCARICA IL PREVENTIVO",
