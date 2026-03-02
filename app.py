@@ -27,7 +27,7 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CLASSE PDF "MALDARIZZI FINAL WHITE" ---
+    # --- 2. CLASSE PDF "MALDARIZZI USATO LIBERO" ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -40,14 +40,12 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # SFONDO DALL'IMMAGINE SLIDER
             if os.path.exists("slider-maldarizzirent.jpg"):
                 self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
             else:
                 self.set_fill_color(30, 30, 30)
                 self.rect(0, 0, 210, 297, 'F')
 
-            # BARRA SUPERIORE NERA
             self.set_fill_color(0, 0, 0)
             self.rect(0, 0, 210, 40, 'F')
             if os.path.exists("logo.png"):
@@ -55,7 +53,7 @@ if check_password():
             
             self.set_y(45)
             self.set_font(self.f_f, "B", 20)
-            self.set_text_color(255, 255, 255) # TESTO BIANCO
+            self.set_text_color(255, 255, 255)
             self.cell(0, 10, "IL TUO PREVENTIVO", align="C", ln=True)
 
     # --- 3. INTERFACCIA STREAMLIT ---
@@ -71,7 +69,7 @@ if check_password():
         st.sidebar.success("Database aggiornato!")
 
     if not os.path.exists("dati.xlsx"):
-        st.error("Carica dati.xlsx")
+        st.error("Carica dati.xlsx per procedere")
         st.stop()
 
     excel = pd.ExcelFile("dati.xlsx")
@@ -88,18 +86,24 @@ if check_password():
     with c1:
         st.subheader("👤 Cliente")
         nome_cliente = st.text_input("Nome Cliente", "Gentile CLIENTE")
-        t_veicolo = st.radio("Stato", ["Nuovo", "Usato"], horizontal=True)
+        t_veicolo = st.radio("Stato Veicolo", ["Nuovo", "Usato"], horizontal=True)
         note_p = st.text_area("Note e optional", height=70)
     with c2:
         st.subheader("🚘 Veicolo")
-        marca = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
-        modello_f = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca]['Vehicle Set description'].unique().tolist()))
         
-        # --- DESCRIZIONE EDITABILE PER USATO ---
+        # --- LOGICA EDITABILE PER USATO ---
         if t_veicolo == "Usato":
-            versione = st.text_area("Descrizione Mezzo Usato", "Inserisci KM, Anno e Allestimento...")
+            marca_stampa = st.text_input("Marca (es. BMW)")
+            # Il modello serve solo come riferimento nel nome file, ma non lo stampiamo per tua richiesta precedente
+            modello_stampa = st.text_input("Modello (es. X3)")
+            versione_stampa = st.text_area("Allestimento/Versione (es. xDrive 20d MSport 2021)")
         else:
-            versione = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca) & (df['Vehicle Set description']==modello_f)]['Jato Product Description'].unique().tolist()))
+            marca_sel = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
+            modello_sel = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca_sel]['Vehicle Set description'].unique().tolist()))
+            versione_sel = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca_sel) & (df['Vehicle Set description']==modello_sel)]['Jato Product Description'].unique().tolist()))
+            marca_stampa = marca_sel
+            modello_stampa = modello_sel
+            versione_stampa = versione_sel
         
         foto_m = st.file_uploader("Foto Auto", type=["jpg", "png", "jpeg"])
 
@@ -132,7 +136,7 @@ if check_password():
 
     # --- GENERAZIONE PDF ---
     if st.button("🚀 GENERA PREVENTIVO"):
-        # --- PIOGGIA DI AUTO ---
+        # PIOGGIA DI AUTO
         st.markdown("""
             <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                 <style>
@@ -144,9 +148,8 @@ if check_password():
 
         pdf = MaldarizziPDF()
         pdf.add_page()
-        pdf.set_text_color(255, 255, 255) # TESTO BIANCO
+        pdf.set_text_color(255, 255, 255)
         
-        # Data
         data_it = datetime.now().strftime('%d %B %Y').upper()
         pdf.set_y(58)
         pdf.set_font(pdf.f_f, "", 9)
@@ -160,17 +163,17 @@ if check_password():
         if foto_m:
             with open(f_path, "wb") as f: f.write(foto_m.getbuffer())
         else:
-            f_path = f"foto_vetture/{marca.upper()}.jpg"
+            f_path = f"foto_vetture/{marca_stampa.upper()}.jpg"
         
         if os.path.exists(f_path):
             pdf.image(f_path, 110, y_pos, 90)
         
         pdf.set_xy(15, y_pos)
         pdf.set_font(pdf.f_f, "B", 20)
-        pdf.multi_cell(90, 8, marca.upper())
+        pdf.multi_cell(90, 8, marca_stampa.upper())
         pdf.set_x(15)
         pdf.set_font(pdf.f_f, "", 11)
-        pdf.multi_cell(90, 5, versione)
+        pdf.multi_cell(90, 5, versione_stampa)
         
         pdf.ln(4)
         pdf.set_font(pdf.f_f, "B", 10)
@@ -199,7 +202,6 @@ if check_password():
         
         pdf.multi_cell(0, 5, " | ".join(serv_list), align="C")
         
-        # Disclaimer
         pdf.ln(2)
         pdf.set_font(pdf.f_f, "I", 8)
         pdf.set_text_color(220, 220, 220)
@@ -234,4 +236,4 @@ if check_password():
         pdf.output("preventivo.pdf")
         st.success("Preventivo Generato!")
         with open("preventivo.pdf", "rb") as f:
-            st.download_button("📩 SCARICA", f, f"Offerta_{marca}.pdf", key=f"dl_{datetime.now().timestamp()}")
+            st.download_button("📩 SCARICA", f, f"Offerta_{marca_stampa}.pdf", key=f"dl_{datetime.now().timestamp()}")
