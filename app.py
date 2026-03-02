@@ -8,6 +8,18 @@ from fpdf import FPDF
 from datetime import datetime
 import locale
 
+# --- FUNZIONE PULIZIA TESTO (Risolve l'errore FPDFUnicodeEncodingException) ---
+def pulisci_testo(testo):
+    if not testo: return ""
+    testo = str(testo)
+    sostituzioni = {
+        '€': 'Euro', '\u2019': "'", '\u2018': "'", '\u201c': '"', '\u201d': '"',
+        '\u2013': '-', '\u2014': '-', '\u2022': '-', '\xa0': ' ', '\t': ' ', '\r': ''
+    }
+    for k, v in sostituzioni.items():
+        testo = testo.replace(k, v)
+    return testo.encode('latin-1', 'ignore').decode('latin-1')
+
 # --- 1. FUNZIONE LOGIN ---
 def check_password():
     if "authenticated" not in st.session_state:
@@ -42,7 +54,7 @@ if "val_versione_stampa" not in st.session_state: st.session_state["val_versione
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
-if "debug_text" not in st.session_state: st.session_state["debug_text"] = "" # NUOVA MEMORIA PER IL DEBUG
+if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 
 if check_password():
     # --- 2. CLASSE PDF ---
@@ -84,7 +96,6 @@ if check_password():
     pdf_portale = st.sidebar.file_uploader("Carica PDF (Arval, Leasys, Ayvens)", type=["pdf"])
     
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
-        testo_pulito = ""
         try:
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
             reader = PyPDF2.PdfReader(pdf_bytes)
@@ -93,83 +104,81 @@ if check_password():
                 t = page.extract_text()
                 if t: testo_estratto += t + " \n "
             
-            testo_pulito = testo_estratto.replace('\n', ' ').replace('\r', ' ')
-            testo_upper = testo_pulito.upper()
+            # Appiattimento estremo del testo
+            testo_flat = re.sub(r'\s+', ' ', testo_estratto).strip()
+            testo_upper = testo_flat.upper()
             
-            # SALVO IL TESTO IN MEMORIA PER POTERLO VEDERE SEMPRE
-            st.session_state["debug_text"] = testo_pulito
+            st.session_state["debug_text"] = testo_flat
             st.session_state["val_input_mode"] = "Testo Libero"
 
-            # --- ESTRATTORE SPECIFICO PER SOCIETÀ ---
+            # 1. ESTRAZIONE MARCA E VERSIONE (Intelligenza a Liste)
+            brands = ['FIAT', 'CITROEN', 'FORD', 'AUDI', 'BMW', 'MERCEDES', 'VOLKSWAGEN', 'PEUGEOT', 'RENAULT', 'OPEL', 'ALFA ROMEO', 'JEEP', 'TOYOTA', 'NISSAN', 'VOLVO', 'KIA', 'HYUNDAI', 'DACIA', 'LANCIA', 'SEAT', 'CUPRA', 'SUZUKI', 'MAZDA', 'LAND ROVER', 'PORSCHE', 'TESLA', 'MINI', 'LEXUS', 'MASERATI', 'SMART', 'SKODA', 'HONDA', 'MG', 'POLESTAR', 'DS', 'IVECO']
+            for b in brands:
+                if b in testo_upper:
+                    # Cattura il brand e il testo seguente fino a elementi di rottura (Durata, Canone, Iva)
+                    m_vei = re.search(fr'\b({b}\s+.{{5,120}}?)(?=\b24\b|\b36\b|\b48\b|\b60\b|\bCanone\b|€|Iva|\d{{2}}/\d{{2}}/\d{{4}}|Prezzo|SOCIETE)', testo_flat, re.IGNORECASE)
+                    if m_vei:
+                        v_str = m_vei.group(1).strip()
+                        v_str = re.sub(r'\s*:\s*$', '', v_str) # Pulisce i due punti finali
+                        st.session_state["val_marca_stampa"] = b
+                        st.session_state["val_versione_stampa"] = v_str
+                        break
+
+            # 2. ESTRAZIONE CLIENTE SPECIFICA
             if "ARVAL" in testo_upper:
-                m_cli = re.search(r'Ragione Sociale\s+(.*?)\s+CF Cliente', testo_pulito, re.IGNORECASE)
+                m_cli = re.search(r'Ragione Sociale\s+([A-Za-z0-9\s\&]+?)\s+CF Cliente', testo_flat, re.IGNORECASE)
                 if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
-                
-                m_vei = re.search(r'per il veicolo\s+(.*?)\s+Canone', testo_pulito, re.IGNORECASE)
-                if m_vei:
-                    vei = m_vei.group(1).strip()
-                    st.session_state["val_marca_stampa"] = vei.split()[0] if vei else ""
-                    st.session_state["val_versione_stampa"] = vei
-
-                m_can = re.search(r'Canone\s+(\d{1,4}[,.]\d{2})', testo_pulito, re.IGNORECASE)
-                if m_can: st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
-
-                m_dur = re.search(r'durata\s+(\d{2,3})\s*mesi', testo_pulito, re.IGNORECASE)
-                if m_dur: st.session_state["val_durata"] = int(m_dur.group(1))
-
-                m_km = re.search(r'km totali\s+(\d{2,6})', testo_pulito, re.IGNORECASE)
-                if m_km:
-                    km_tot = int(m_km.group(1))
-                    durata = st.session_state.get("val_durata", 36)
-                    st.session_state["val_km"] = int((km_tot / durata) * 12) if durata else km_tot
-
             elif "LEASYS" in testo_upper:
-                m_can = re.search(r'Canone Totale\s*€\s*(\d{1,4}[,.]\d{2})', testo_pulito, re.IGNORECASE)
-                if m_can: st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
-                
-                m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{2,3}\s*\d{3})\b', testo_pulito)
-                if m_dur_km:
-                    st.session_state["val_durata"] = int(m_dur_km.group(1))
-                    km_tot = int(m_dur_km.group(2).replace(' ', ''))
-                    durata = st.session_state.get("val_durata", 36)
-                    st.session_state["val_km"] = int((km_tot / durata) * 12) if durata else km_tot
-
-                m_vei = re.search(r'Versione\s+Durata\s+km totall(.*?)\b(?:24|36|48|60)\b', testo_pulito, re.IGNORECASE)
-                if m_vei:
-                    vei = m_vei.group(1).strip()
-                    vei = re.sub(r'\s+', ' ', vei)
-                    st.session_state["val_marca_stampa"] = vei.split()[0] if vei else ""
-                    st.session_state["val_versione_stampa"] = vei
-
+                # In Leasys il cliente è tra "VENDITA" e il numero di telefono
+                m_cli = re.search(r'VENDITA\s+([A-Za-z0-9\s\&]+?)\s+(?:\+39|\d{9,10})', testo_flat, re.IGNORECASE)
+                if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("SRL", "").replace("SPA", "").strip()
             elif "AYVENS" in testo_upper or "ALD " in testo_upper:
-                m_cli = re.search(r'Att\.ne di\s*:\s*(.*?)\s*Lettera', testo_pulito, re.IGNORECASE)
+                # In Ayvens il cliente è dopo i primi due punti
+                m_cli = re.search(r'Att\.ne di\s*.*?\s*:\s*([A-Za-z\s]{3,40})\s*:', testo_flat, re.IGNORECASE)
                 if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
 
-                m_vei = re.search(r'Veicolo\s*:\s*(.*?)\s*Data listino', testo_pulito, re.IGNORECASE)
-                if m_vei:
-                    vei = m_vei.group(1).strip()
-                    st.session_state["val_marca_stampa"] = vei.split()[0] if vei else ""
-                    st.session_state["val_versione_stampa"] = vei
+            # 3. DURATA E KM
+            m_dur = re.findall(r'\b(24|36|48|60)\b', testo_flat)
+            if m_dur: st.session_state["val_durata"] = int(m_dur[0])
 
-                m_canoni = re.findall(r'€\s*(\d{2,4}\.\d{2})', testo_pulito)
-                if m_canoni:
-                    st.session_state["val_canone"] = max([float(c) for c in m_canoni])
+            m_kms = re.findall(r'\b(\d{2,3}[\s\.]?000)\b', testo_flat)
+            if m_kms:
+                km_list = [int(re.sub(r'\D', '', k)) for k in m_kms]
+                km_tot = max(km_list)
+                mesi = st.session_state.get("val_durata", 36)
+                if km_tot > 35000 and mesi > 0:
+                    st.session_state["val_km"] = int(km_tot / (mesi / 12))
+                else:
+                    st.session_state["val_km"] = km_tot
 
-                m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{2,3}\s*\d{3}|\d{2,6})\b', testo_pulito)
-                if m_dur_km:
-                    st.session_state["val_durata"] = int(m_dur_km.group(1))
-                    km_tot = int(m_dur_km.group(2).replace(' ', ''))
-                    durata = st.session_state.get("val_durata", 36)
-                    st.session_state["val_km"] = int((km_tot / durata) * 12) if durata else km_tot
+            # 4. CANONE
+            m_canoni = re.findall(r'(\d{2,4}[,.]\d{2})', testo_flat)
+            valid_canoni = []
+            for c in m_canoni:
+                try:
+                    v = float(c.replace('.', '').replace(',', '.'))
+                    if 150 < v < 3000: valid_canoni.append(v)
+                except: pass
+            if valid_canoni:
+                st.session_state["val_canone"] = max(valid_canoni)
 
-            st.sidebar.success("✅ Dati estratti e calcolati con successo!")
+            # 5. PENALI BASE
+            if "500" in testo_flat and ("Danni" in testo_flat or "Kasko" in testo_flat): st.session_state["val_p_kasko"] = "500 Euro"
+            elif "1000" in testo_flat: st.session_state["val_p_kasko"] = "1000 Euro"
+            
+            if "250" in testo_flat and "RCA" in testo_flat: st.session_state["val_p_rca"] = "250 Euro"
+            elif "500" in testo_flat and "RCA" in testo_flat: st.session_state["val_p_rca"] = "500 Euro"
+            
+            if "10%" in testo_flat: st.session_state["val_p_if"] = "10%"
+            elif "5%" in testo_flat: st.session_state["val_p_if"] = "5%"
+
+            st.sidebar.success("✅ Lettura Leasys/Ayvens/Arval completata con successo!")
             st.rerun()
             
         except Exception as e:
             st.session_state["debug_text"] = testo_pulito if testo_pulito else f"Errore: {str(e)}"
             st.sidebar.error(f"Errore tecnico: {str(e)}")
 
-    # MOSTRA SEMPRE IL TESTO DEBUG SE PRESENTE
     if st.session_state.get("debug_text"):
         with st.sidebar.expander("🛠️ Mostra Testo Letto dal PDF (Debug)"):
             st.write(st.session_state["debug_text"])
@@ -221,7 +230,7 @@ if check_password():
         foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
-    st.subheader("🔧 Servizi e Penali")
+    st.subheader("🛡️ Servizi e Penali")
     s1, s2, s3 = st.columns(3)
     
     with s1:
@@ -264,9 +273,11 @@ if check_password():
     if st.button("➕ AGGIUNGI AL DOCUMENTO"):
         foto_bytes = foto_m.getvalue() if foto_m else None
         auto_aggiunta = {
-            "cliente": nome_cliente, "consegna": consegna, "t_veicolo": t_veicolo, "note": note_p,
-            "marca": marca_stampa, "versione": versione_stampa, "foto_bytes": foto_bytes,
-            "p_rca": p_rca, "p_if": p_if, "p_kasko": p_kasko, "infort": infort, "g_num": g_num,
+            "cliente": pulisci_testo(nome_cliente), "consegna": pulisci_testo(consegna), 
+            "t_veicolo": pulisci_testo(t_veicolo), "note": pulisci_testo(note_p),
+            "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
+            "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
+            "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
             "canone": canone, "anticipo": anticipo, "durata": durata, "km": km
         }
         st.session_state["lista_preventivi"].append(auto_aggiunta)
@@ -298,9 +309,9 @@ if check_password():
                     
                     pdf.set_y(58)
                     pdf.set_font(pdf.f_f, "", 9)
-                    pdf.cell(0, 5, f"{data_it} - VALIDITÀ {g_validita} GIORNI", align="C", ln=True)
+                    pdf.cell(0, 5, pulisci_testo(f"{data_it} - VALIDITÀ {g_validita} GIORNI"), align="C", ln=True)
                     pdf.set_font(pdf.f_f, "B", 12)
-                    pdf.cell(0, 8, f"SPETT.LE {p['cliente'].upper()}", align="C", ln=True)
+                    pdf.cell(0, 8, pulisci_testo(f"SPETT.LE {p['cliente'].upper()}"), align="C", ln=True)
 
                     y_pos = 85
                     f_path = "tmp_multi.png"
@@ -322,56 +333,56 @@ if check_password():
                     pdf.ln(4)
                     pdf.set_font(pdf.f_f, "B", 10)
                     pdf.set_x(15)
-                    pdf.cell(90, 6, f"STATO: {p['t_veicolo'].upper()} ({p['consegna']})", ln=True)
+                    pdf.cell(90, 6, pulisci_testo(f"STATO: {p['t_veicolo'].upper()} ({p['consegna']})"), ln=True)
                     pdf.set_x(15)
-                    pdf.cell(90, 6, f"DURATA CONTRATTO: {p['durata']} MESI", ln=True)
+                    pdf.cell(90, 6, pulisci_testo(f"DURATA CONTRATTO: {p['durata']} MESI"), ln=True)
                     pdf.set_x(15)
-                    pdf.cell(90, 6, f"KM/ANNO: {p['km']:,} KM".replace(",", "."), ln=True)
+                    pdf.cell(90, 6, pulisci_testo(f"KM/ANNO: {p['km']:,} KM".replace(",", ".")), ln=True)
 
                     pdf.set_y(155)
                     pdf.set_font(pdf.f_f, "B", 11)
-                    pdf.cell(0, 7, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
+                    pdf.cell(0, 7, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
                     pdf.set_font(pdf.f_f, "", 9)
                     
                     serv_list = [
-                        f"RCA (Penale {p['p_rca']})", 
-                        f"Incendio/Furto (Penale {p['p_if']})",
-                        f"Danni/Kasko (Penale {p['p_kasko']})",
+                        f"RCA (Franchigia {p['p_rca']})", 
+                        f"Incendio/Furto (Franchigia {p['p_if']})",
+                        f"Danni/Kasko (Franchigia {p['p_kasko']})",
                         "Manutenzione Ordinaria/Straordinaria",
                         "Assistenza Stradale H24"
                     ]
                     if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
                     if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
                     
-                    pdf.multi_cell(0, 5, " | ".join(serv_list), align="C")
+                    pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
                     
                     pdf.ln(2)
                     pdf.set_font(pdf.f_f, "I", 8)
                     pdf.set_text_color(220, 220, 220)
-                    pdf.cell(0, 5, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.", align="C", ln=True)
+                    pdf.cell(0, 5, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C", ln=True)
 
                     pdf.set_y(210)
                     pdf.set_text_color(255, 255, 255)
                     pdf.set_font(pdf.f_f, "B", 28)
-                    pdf.cell(0, 15, f"EURO {p['canone']}/MESE", align="C", ln=True)
+                    pdf.cell(0, 15, pulisci_testo(f"EURO {p['canone']}/MESE"), align="C", ln=True)
                     pdf.set_font(pdf.f_f, "B", 14)
-                    pdf.cell(0, 8, f"Anticipo: Euro {p['anticipo']} (Iva Esclusa)", align="C", ln=True)
+                    pdf.cell(0, 8, pulisci_testo(f"Anticipo: Euro {p['anticipo']} (Iva Esclusa)"), align="C", ln=True)
 
                     if p['note']:
                         pdf.ln(2)
                         pdf.set_font(pdf.f_f, "I", 9)
-                        pdf.multi_cell(0, 5, f"Note: {p['note']}", align="C")
+                        pdf.multi_cell(0, 5, pulisci_testo(f"Note: {p['note']}"), align="C")
 
                     pdf.set_fill_color(0, 0, 0)
                     pdf.rect(0, 260, 210, 37, 'F')
                     pdf.set_y(265)
                     pdf.set_text_color(255, 255, 255)
                     pdf.set_font(pdf.f_f, "B", 10)
-                    pdf.cell(0, 6, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
+                    pdf.cell(0, 6, pulisci_testo(f"CONSULENTE: {nome_cons.upper()}"), align="C", ln=True)
                     pdf.set_font(pdf.f_f, "", 9)
-                    pdf.cell(0, 5, f"E-mail: {email_cons} | Tel: {tel_cons}", align="C", ln=True)
+                    pdf.cell(0, 5, pulisci_testo(f"E-mail: {email_cons} | Tel: {tel_cons}"), align="C", ln=True)
                     pdf.set_font(pdf.f_f, "I", 7)
-                    pdf.cell(0, 8, "MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/", align="C", ln=True)
+                    pdf.cell(0, 8, pulisci_testo("MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/"), align="C", ln=True)
 
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
