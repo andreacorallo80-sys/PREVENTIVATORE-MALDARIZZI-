@@ -71,17 +71,32 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
+            # Blocco di sicurezza per l'immagine di sfondo
+            sfondo_caricato = False
             if os.path.exists("slider-maldarizzirent.jpg"):
-                self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
-            else:
+                try:
+                    self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
+                    sfondo_caricato = True
+                except Exception:
+                    pass # Se fallisce, ignora l'errore e passa oltre
+            
+            # Se l'immagine non c'è o ha un formato non supportato, usa lo sfondo scuro
+            if not sfondo_caricato:
                 self.set_fill_color(30, 30, 30)
                 self.rect(0, 0, 210, 297, 'F')
 
+            # Barra superiore nera
             self.set_fill_color(0, 0, 0)
             self.rect(0, 0, 210, 40, 'F')
-            if os.path.exists("logo.png"):
-                self.image("logo.png", 75, 8, 60)
             
+            # Blocco di sicurezza per il logo
+            if os.path.exists("logo.png"):
+                try:
+                    self.image("logo.png", 75, 8, 60)
+                except Exception:
+                    pass
+            
+            # Titolo
             self.set_y(45)
             self.set_font(self.f_f, "B", 20)
             self.set_text_color(255, 255, 255)
@@ -445,3 +460,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
