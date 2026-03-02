@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import os
+import re
+import PyPDF2
 from fpdf import FPDF
 from datetime import datetime
 import locale
@@ -26,9 +28,12 @@ def check_password():
         return False
     return True
 
-# INIZIALIZZAZIONE LISTA PREVENTIVI IN MEMORIA
-if "lista_preventivi" not in st.session_state:
-    st.session_state["lista_preventivi"] = []
+# --- VARIABILI IN MEMORIA PER ESTRAZIONE E CARRELLO ---
+if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
+if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
+if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
+if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
+if "val_anticipo" not in st.session_state: st.session_state["val_anticipo"] = 0.0
 
 if check_password():
     # --- 2. CLASSE PDF "MALDARIZZI MULTI-PAGE" ---
@@ -44,14 +49,12 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # Sfondo dall'immagine
             if os.path.exists("slider-maldarizzirent.jpg"):
                 self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
             else:
                 self.set_fill_color(30, 30, 30)
                 self.rect(0, 0, 210, 297, 'F')
 
-            # Barra Superiore Nera
             self.set_fill_color(0, 0, 0)
             self.rect(0, 0, 210, 40, 'F')
             if os.path.exists("logo.png"):
@@ -64,24 +67,62 @@ if check_password():
 
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
-    
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
     except: pass
 
-    # Sidebar
-    st.sidebar.header("📁 Database")
-    uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino", type=["xlsx"])
+    # --- SIDEBAR: LETTURA PDF CONCORRENZA / PORTALI ---
+    st.sidebar.header("📥 Importa PDF Portale")
+    pdf_portale = st.sidebar.file_uploader("Carica PDF (Arval, Leasys, Ayvens...)", type=["pdf"])
+    
+    if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
+        try:
+            reader = PyPDF2.PdfReader(pdf_portale)
+            testo_estratto = ""
+            for page in reader.pages:
+                testo_estratto += page.extract_text() + " "
+            
+            # Estrazione Durata (Cerca 24, 36, 48, 60 mesi)
+            match_durata = re.search(r'(24|36|48|60)\s*mesi', testo_estratto, re.IGNORECASE)
+            if match_durata: 
+                st.session_state["val_durata"] = int(match_durata.group(1))
+            
+            # Estrazione Canone (Cerca numero con virgola vicino a € o Euro)
+            match_canone = re.search(r'(\d{3,4},\d{2})\s*(?:€|euro)', testo_estratto, re.IGNORECASE)
+            if match_canone:
+                canone_pulito = float(match_canone.group(1).replace('.', '').replace(',', '.'))
+                st.session_state["val_canone"] = canone_pulito
+
+            # Estrazione KM totali o annui
+            match_km = re.search(r'(\d{2,3}[\.,\s]?\d{3})\s*km', testo_estratto, re.IGNORECASE)
+            if match_km:
+                km_pulito = int(re.sub(r'\D', '', match_km.group(1)))
+                # Se il PDF riporta i KM TOTALI (es. 60000 su 48 mesi), calcoliamo quelli annui
+                if km_pulito > 30000:
+                    mesi = st.session_state["val_durata"]
+                    km_annui = int((km_pulito / mesi) * 12)
+                    st.session_state["val_km"] = km_annui
+                else:
+                    st.session_state["val_km"] = km_pulito
+
+            st.sidebar.success("Dati estratti e compilati con successo!")
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error("Errore nella lettura del PDF.")
+
+    st.sidebar.markdown("---")
+    st.sidebar.header("📁 Database Listino")
+    uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
     if uploaded_excel:
         with open("dati.xlsx", "wb") as f: f.write(uploaded_excel.getbuffer())
         st.sidebar.success("Database aggiornato!")
 
-    if not os.path.exists("dati.xlsx"):
+    if os.path.exists("dati.xlsx"):
+        excel = pd.ExcelFile("dati.xlsx")
+        foglio = st.sidebar.selectbox("Seleziona Categoria", excel.sheet_names)
+        df = pd.read_excel("dati.xlsx", sheet_name=foglio, dtype=str)
+    else:
         st.error("Carica dati.xlsx per procedere")
         st.stop()
-
-    excel = pd.ExcelFile("dati.xlsx")
-    foglio = st.sidebar.selectbox("Seleziona Categoria", excel.sheet_names)
-    df = pd.read_excel("dati.xlsx", sheet_name=foglio, dtype=str)
     
     st.sidebar.markdown("---")
     g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
@@ -132,18 +173,18 @@ if check_password():
     st.markdown("---")
     st.subheader("💸 Dati Economici")
     n1, n2, n3, n4 = st.columns(4)
-    with n1: canone = st.number_input("Canone/Mese (Euro)", value=500)
-    with n2: anticipo = st.number_input("Anticipo (Euro)", value=0)
-    with n3: durata = st.selectbox("Durata (Mesi)", [24, 36, 48, 60], index=1)
-    with n4: km = st.number_input("Km/Anno", value=15000)
+    # I CAMPI VENGONO AUTO-COMPILATI DALL'ESTRATTORE PDF
+    with n1: canone = st.number_input("Canone/Mese (Euro)", value=float(st.session_state["val_canone"]))
+    with n2: anticipo = st.number_input("Anticipo (Euro)", value=float(st.session_state["val_anticipo"]))
+    with n3: 
+        idx_durata = [24, 36, 48, 60].index(st.session_state["val_durata"]) if st.session_state["val_durata"] in [24, 36, 48, 60] else 1
+        durata = st.selectbox("Durata (Mesi)", [24, 36, 48, 60], index=idx_durata)
+    with n4: km = st.number_input("Km/Anno", value=int(st.session_state["val_km"]))
 
     st.markdown("---")
     # --- LOGICA MULTI-PREVENTIVO ---
     if st.button("➕ AGGIUNGI AL DOCUMENTO"):
-        # Salva la foto in byte se presente, altrimenti None
         foto_bytes = foto_m.getvalue() if foto_m else None
-        
-        # Crea un dizionario con tutti i dati del veicolo corrente
         auto_aggiunta = {
             "cliente": nome_cliente, "consegna": consegna, "t_veicolo": t_veicolo, "note": note_p,
             "marca": marca_stampa, "versione": versione_stampa, "foto_bytes": foto_bytes,
@@ -151,9 +192,8 @@ if check_password():
             "canone": canone, "anticipo": anticipo, "durata": durata, "km": km
         }
         st.session_state["lista_preventivi"].append(auto_aggiunta)
-        st.success(f"✅ {marca_stampa} aggiunto al documento! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
+        st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
 
-    # MOSTRA IL CARRELLO E IL TASTO DI STAMPA
     if len(st.session_state["lista_preventivi"]) > 0:
         st.info(f"🛒 Hai aggiunto **{len(st.session_state['lista_preventivi'])}** veicoli al preventivo congiunto.")
         
@@ -165,8 +205,6 @@ if check_password():
                 
         with col_stampa:
             if st.button("🚀 STAMPA PREVENTIVO UNICO (PDF MULTIPLO)"):
-                
-                # Pioggia di auto
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -176,7 +214,6 @@ if check_password():
                 pdf = MaldarizziPDF()
                 data_it = datetime.now().strftime('%d %B %Y').upper()
                 
-                # CICLO SU TUTTE LE AUTO AGGIUNTE
                 for p in st.session_state["lista_preventivi"]:
                     pdf.add_page()
                     pdf.set_text_color(255, 255, 255)
@@ -247,7 +284,6 @@ if check_password():
                         pdf.set_font(pdf.f_f, "I", 9)
                         pdf.multi_cell(0, 5, f"Note: {p['note']}", align="C")
 
-                    # BARRA INFERIORE NERA
                     pdf.set_fill_color(0, 0, 0)
                     pdf.rect(0, 260, 210, 37, 'F')
                     pdf.set_y(265)
