@@ -1,8 +1,7 @@
-import streamlit as st
 import pandas as pd
 import os
 import re
-import PyPDF2
+import pypdf   # <--- ECCOLO! Assicurati che ci sia questo e NON import PyPDF2
 import io
 from fpdf import FPDF
 from datetime import datetime
@@ -424,4 +423,5 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
