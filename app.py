@@ -55,6 +55,7 @@ if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Eur
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
 if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
+if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
     # --- 2. CLASSE PDF ---
@@ -97,8 +98,6 @@ if check_password():
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
-            
-            # QUI USIAMO IL NUOVO MOTORE PYPDF
             reader = pypdf.PdfReader(pdf_bytes)
             
             testo_estratto = ""
@@ -186,6 +185,13 @@ if check_password():
                 m_ant = re.search(r'Anticipo\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
                     st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
+                
+                # 8. Franchigia KM: Sveliamo il trucchetto Leasys!
+                m_fran = re.search(r'Franchigia km\s+([\d\s]+)\b', testo_flat, re.IGNORECASE)
+                if m_fran:
+                    franchigia_km = int(m_fran.group(1).replace(' ', ''))
+                    if franchigia_km > 0:
+                        st.session_state["val_note"] = f"Nota bene: il contratto include {franchigia_km} km di franchigia aggiuntivi da sommare al totale."
 
             elif "ARVAL" in testo_upper:
                 m_cli = re.search(r'Ragione Sociale\s+([A-Za-z0-9\s\&]+?)\s+CF Cliente', testo_flat, re.IGNORECASE)
@@ -263,7 +269,7 @@ if check_password():
         nome_cliente = st.text_input("Nome Cliente", value=st.session_state.get("val_cliente", ""))
         consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
         t_veicolo = st.radio("Stato Veicolo (Stampa)", ["Nuovo", "Usato"], horizontal=True)
-        note_p = st.text_area("Note e optional", height=70)
+        note_p = st.text_area("Note e optional", value=st.session_state.get("val_note", ""), height=70)
     
     with c2:
         st.subheader("🚘 Veicolo")
@@ -439,5 +445,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
