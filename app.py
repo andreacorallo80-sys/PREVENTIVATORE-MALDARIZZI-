@@ -97,7 +97,7 @@ if check_password():
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
-            reader = PyPDF2.PdfReader(pdf_bytes)
+            reader = pypdf.PdfReader(pdf_bytes)
             testo_estratto = ""
             for page in reader.pages:
                 t = page.extract_text()
@@ -424,3 +424,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
