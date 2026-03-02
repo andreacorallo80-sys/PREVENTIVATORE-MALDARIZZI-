@@ -116,11 +116,13 @@ if check_password():
                 m_cli = re.search(r':\s*([A-Z\s]{4,40}?)\s*\d{6,9}/\d{2,3}', testo_flat)
                 if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("VITO VITO", "VITO").strip()
 
-                # Veicolo
-                m_vei = re.search(r'(?:OFFERTA STANDARD|Second Life|OFFERTA PROMOZIONALE)\s+([A-Z0-9\s\.\-\(\)]+?)\s+\d{2}/\d{2}/\d{4}', testo_flat)
+                # Veicolo: regex più inclusiva che prende anche caratteri speciali e minuscole
+                m_vei = re.search(r'(?:OFFERTA STANDARD|Second Life|OFFERTA PROMOZIONALE)\s+(.*?)\s+\d{2}/\d{2}/\d{2,4}', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
-                    st.session_state["val_marca_stampa"] = vei.split()[0]
+                    parti = vei.split()
+                    if len(parti) > 0: # Controllo di sicurezza anti IndexError
+                        st.session_state["val_marca_stampa"] = parti[0].upper()
                     st.session_state["val_versione_stampa"] = vei
 
                 # Durata e KM
@@ -128,19 +130,21 @@ if check_password():
                 if m_dur_km:
                     st.session_state["val_durata"] = int(m_dur_km.group(1))
                     km_tot = int(m_dur_km.group(2))
-                    st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
+                    if st.session_state["val_durata"] > 0:
+                        st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-                # Canone Ayvens intelligente (scarta il prezzo ivato)
-                m_can = re.findall(r'€\s*(\d{2,4}\.\d{2})', testo_flat)
+                # Canone Ayvens Intelligente
+                m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
                 if m_can:
-                    valori = sorted([float(c) for c in m_can], reverse=True)
-                    massimo = valori[0]
-                    prezzo_corretto = massimo
-                    for v in valori:
-                        if abs(massimo - (v * 1.22)) < 1.0: 
-                            prezzo_corretto = v
-                            break
-                    st.session_state["val_canone"] = prezzo_corretto
+                    valori = sorted([float(c.replace(',', '.')) for c in m_can], reverse=True)
+                    if len(valori) > 0: # Controllo di sicurezza anti IndexError
+                        massimo = valori[0]
+                        prezzo_corretto = massimo
+                        for v in valori:
+                            if abs(massimo - (v * 1.22)) < 1.0: 
+                                prezzo_corretto = v
+                                break
+                        st.session_state["val_canone"] = prezzo_corretto
 
             elif "LEASYS" in testo_upper:
                 m_cli = re.search(r'(?:VENDITA|CLIENTE)\s+([A-Za-z0-9\s\&]+?)\s+(?:\+39|\d{9,10})', testo_flat, re.IGNORECASE)
@@ -158,10 +162,15 @@ if check_password():
                 if m_dur_km:
                     st.session_state["val_durata"] = int(m_dur_km.group(1))
                     km_tot = int(m_dur_km.group(2).replace(' ', ''))
-                    st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
+                    if st.session_state["val_durata"] > 0:
+                        st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
                 m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
-                if m_can: st.session_state["val_canone"] = max([float(c.replace(',', '.')) for c in m_can if float(c.replace(',', '.')) < 3000])
+                if m_can: 
+                    # Controllo di sicurezza anti IndexError e ValueError sulle liste
+                    canoni_validi = [float(c.replace(',', '.')) for c in m_can if float(c.replace(',', '.')) < 3000]
+                    if len(canoni_validi) > 0:
+                        st.session_state["val_canone"] = max(canoni_validi)
 
             elif "ARVAL" in testo_upper:
                 m_cli = re.search(r'Ragione Sociale\s+([A-Za-z0-9\s\&]+?)\s+CF Cliente', testo_flat, re.IGNORECASE)
@@ -170,7 +179,9 @@ if check_password():
                 m_vei = re.search(r'per il veicolo\s+(.*?)\s+Canone', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
-                    st.session_state["val_marca_stampa"] = vei.split()[0] if vei else ""
+                    parti = vei.split()
+                    if len(parti) > 0: # Controllo di sicurezza anti IndexError
+                        st.session_state["val_marca_stampa"] = parti[0]
                     st.session_state["val_versione_stampa"] = vei
 
                 m_can = re.search(r'Canone\s+(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
@@ -183,7 +194,10 @@ if check_password():
                 if m_km:
                     km_tot = int(m_km.group(1))
                     durata = st.session_state.get("val_durata", 36)
-                    st.session_state["val_km"] = int((km_tot / durata) * 12) if durata else km_tot
+                    if durata > 0:
+                        st.session_state["val_km"] = int((km_tot / durata) * 12)
+                    else:
+                        st.session_state["val_km"] = km_tot
 
             # 5. PENALI BASE COMUNI
             if "500" in testo_flat and ("Danni" in testo_flat or "Kasko" in testo_flat): st.session_state["val_p_kasko"] = "500 Euro"
@@ -200,7 +214,6 @@ if check_password():
             st.rerun()
             
         except Exception as e:
-            # Corretto l'errore NameError cambiando testo_pulito in testo_flat
             st.session_state["debug_text"] = testo_flat if 'testo_flat' in locals() else f"Errore: {str(e)}"
             st.sidebar.error(f"Errore durante l'analisi del PDF: {str(e)}")
 
