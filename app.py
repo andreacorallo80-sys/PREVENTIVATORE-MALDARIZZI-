@@ -130,9 +130,22 @@ if check_password():
                     km_tot = int(m_dur_km.group(2))
                     st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-                # Canone: prende i tre canoni in fila e sceglie il più alto (Totale con servizi)
+               # Estrazione Canone Ayvens intelligente
                 m_can = re.findall(r'€\s*(\d{2,4}\.\d{2})', testo_flat)
-                if m_can: st.session_state["val_canone"] = max([float(c) for c in m_can])
+                if m_can:
+                    # Ordiniamo i prezzi dal più grande al più piccolo
+                    valori = sorted([float(c) for c in m_can], reverse=True)
+                    massimo = valori[0]
+                    prezzo_corretto = massimo
+                    
+                    # Controlliamo se il prezzo più alto è in realtà il prezzo ivato (es. 464 = 380 * 1.22)
+                    for v in valori:
+                        # Se un numero moltiplicato per l'IVA del 22% è uguale (circa) al massimo, allora è il nostro canone!
+                        if abs(massimo - (v * 1.22)) < 1.0: 
+                            prezzo_corretto = v
+                            break
+                            
+                    st.session_state["val_canone"] = prezzo_corretto
 
             elif "LEASYS" in testo_upper:
                 m_cli = re.search(r'(?:VENDITA|CLIENTE)\s+([A-Za-z0-9\s\&]+?)\s+(?:\+39|\d{9,10})', testo_flat, re.IGNORECASE)
@@ -191,9 +204,10 @@ if check_password():
             st.sidebar.success("✅ Dati estratti chirurgicamente!")
             st.rerun()
             
-        except Exception as e:
-            st.session_state["debug_text"] = testo_pulito if testo_pulito else f"Errore: {str(e)}"
-            st.sidebar.error(f"Errore tecnico: {str(e)}")
+       except Exception as e:
+            # Abbiamo cambiato 'testo_pulito' in 'testo_flat'
+            st.session_state["debug_text"] = testo_flat if 'testo_flat' in locals() else f"Errore: {str(e)}"
+            st.sidebar.error(f"Errore durante l'analisi del PDF: {str(e)}")
 
     if st.session_state.get("debug_text"):
         with st.sidebar.expander("🛠️ Mostra Testo Letto dal PDF (Debug)"):
@@ -402,3 +416,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
