@@ -78,91 +78,116 @@ if check_password():
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
     except: pass
 
-    # --- SIDEBAR: LETTURA SMART PDF ---
+    # --- SIDEBAR: LETTURA SMART PDF ANTIPROIETTILE ---
     st.sidebar.header("📥 Importa PDF Portale")
     pdf_portale = st.sidebar.file_uploader("Carica PDF (Arval, Leasys, Ayvens)", type=["pdf"])
     
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
-            # FIX: Uso io.BytesIO per gestire il file caricato ed evito errori di memoria
             pdf_bytes = io.BytesIO(pdf_portale.read())
             reader = PyPDF2.PdfReader(pdf_bytes)
             testo_estratto = ""
             for page in reader.pages:
-                testo = page.extract_text()
-                if testo: # FIX: Protezione contro pagine vuote o immagini
-                    testo_estratto += testo + " \n "
+                try:
+                    t = page.extract_text()
+                    if t: testo_estratto += t + " \n "
+                except: pass
             
             testo_pulito = testo_estratto.replace('\r', ' ')
-            st.session_state["val_input_mode"] = "Testo Libero"
-            
-            # 1. DURATA
-            m_dur = re.search(r'(24|36|48|60)\s*mesi', testo_pulito, re.IGNORECASE)
-            if m_dur: st.session_state["val_durata"] = int(m_dur.group(1))
-
-            # 2. KM TOTALI O ANNUI
-            m_km = re.search(r'(?:km totali|percorrenza|km totall)[\s\S]{0,30}?(\d{2,3}[\s\.]?\d{3})', testo_pulito, re.IGNORECASE)
-            if not m_km: m_km = re.search(r'(\d{2,3}[\s\.]?\d{3})\s*km', testo_pulito, re.IGNORECASE)
-            
-            if m_km:
-                km_tot = int(re.sub(r'\D', '', m_km.group(1)))
-                mesi = st.session_state.get("val_durata", 36)
-                if km_tot > 30000 and mesi > 0:
-                    st.session_state["val_km"] = int((km_tot / mesi) * 12)
-                else:
-                    st.session_state["val_km"] = km_tot
-
-            # 3. CANONE
-            m_canoni = re.findall(r'(\d{2,4}[.,]\d{2})', testo_pulito)
-            valid_canoni = [float(c.replace('.', '').replace(',', '.')) for c in m_canoni if 150 < float(c.replace('.', '').replace(',', '.')) < 4000]
-            if valid_canoni:
-                st.session_state["val_canone"] = max(valid_canoni)
-
-            # 4. CLIENTI E VEICOLI
             testo_upper = testo_pulito.upper()
             
+            st.session_state["val_input_mode"] = "Testo Libero"
+
+            # 1. ESTRAZIONE DURATA
+            try:
+                m_dur = re.search(r'(24|36|48|60)\s*mesi', testo_pulito, re.IGNORECASE)
+                if m_dur: st.session_state["val_durata"] = int(m_dur.group(1))
+            except: pass
+
+            # 2. ESTRAZIONE KM
+            try:
+                m_km = re.search(r'(?:km totali|percorrenza|km totall)[\s\S]{0,30}?(\d{2,3}[\s\.]?\d{3})', testo_pulito, re.IGNORECASE)
+                if not m_km: m_km = re.search(r'(\d{2,3}[\s\.]?\d{3})\s*km', testo_pulito, re.IGNORECASE)
+                if m_km:
+                    km_tot = int(re.sub(r'\D', '', m_km.group(1)))
+                    mesi = st.session_state.get("val_durata", 36)
+                    if km_tot > 30000 and mesi > 0:
+                        st.session_state["val_km"] = int((km_tot / mesi) * 12)
+                    else:
+                        st.session_state["val_km"] = km_tot
+            except: pass
+
+            # 3. ESTRAZIONE CANONE
+            try:
+                m_canoni = re.findall(r'(\d{2,4}[.,]\d{2})', testo_pulito)
+                valid_canoni = []
+                for c in m_canoni:
+                    try:
+                        v = float(c.replace('.', '').replace(',', '.'))
+                        if 150 < v < 4000: valid_canoni.append(v)
+                    except: pass
+                if valid_canoni:
+                    st.session_state["val_canone"] = max(valid_canoni)
+            except: pass
+
+            # 4. ESTRAZIONE SOCIETA' (ARVAL / LEASYS / AYVENS)
             if "ARVAL" in testo_upper:
-                m_cli = re.search(r'Ragione Sociale[\s\S]{0,10}?([A-Z\s]{5,})', testo_pulito)
-                if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
-                m_vei = re.search(r'proposta di noleggio per il veicolo\s*([^\n]+)', testo_pulito, re.IGNORECASE)
-                if m_vei: 
-                    vei_str = m_vei.group(1).strip()
-                    if vei_str.split(): st.session_state["val_marca_stampa"] = vei_str.split()[0]
-                    st.session_state["val_versione_stampa"] = vei_str
-                    
+                try:
+                    m_cli = re.search(r'Ragione Sociale[\s\S]{0,15}?([A-Z\s]{5,})', testo_pulito)
+                    if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
+                except: pass
+                try:
+                    m_vei = re.search(r'veicolo[\s\n]+([^\n]+)', testo_pulito, re.IGNORECASE)
+                    if m_vei: 
+                        v_str = m_vei.group(1).strip()
+                        parts = v_str.split()
+                        if parts: st.session_state["val_marca_stampa"] = parts[0]
+                        st.session_state["val_versione_stampa"] = v_str
+                except: pass
+
             elif "LEASYS" in testo_upper:
-                m_cli = re.search(r'CONSULENTE DI VENDITA[\s\S]*?\n\n([^\n]+)', testo_pulito)
-                if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
-                m_vei = re.search(r'km totall?[\s\S]*?\n\n([^\n]+)\n([^\n]+)\n\n([^\n]+)', testo_pulito, re.IGNORECASE)
-                if m_vei:
-                    st.session_state["val_marca_stampa"] = m_vei.group(1).strip()
-                    st.session_state["val_versione_stampa"] = m_vei.group(3).strip()
-                    
+                try:
+                    m_cli = re.search(r'CONSULENTE DI VENDITA[\s\S]*?\n\n([^\n]+)', testo_pulito)
+                    if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
+                except: pass
+                try:
+                    m_vei = re.search(r'Versione[\s\S]*?\n\n([A-Z]+)[\s\S]*?\n([^\n]+)', testo_pulito, re.IGNORECASE)
+                    if m_vei:
+                        st.session_state["val_marca_stampa"] = m_vei.group(1).strip()
+                        st.session_state["val_versione_stampa"] = m_vei.group(2).strip()
+                except: pass
+
             elif "AYVENS" in testo_upper or "ALD " in testo_upper:
-                m_cli = re.search(r'Att\.ne di\s*:\s*([^\n]+)', testo_pulito, re.IGNORECASE)
-                if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
-                m_vei = re.search(r'Veicolo\s*:\s*([^\n]+\n?[^\n]+)', testo_pulito, re.IGNORECASE)
-                if m_vei:
-                    vei_str = m_vei.group(1).replace('\n', ' ').strip()
-                    if vei_str.split(): st.session_state["val_marca_stampa"] = vei_str.split()[0]
-                    st.session_state["val_versione_stampa"] = vei_str
+                try:
+                    m_cli = re.search(r'Att\.ne di\s*:\s*([^\n]+)', testo_pulito, re.IGNORECASE)
+                    if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip()
+                except: pass
+                try:
+                    m_vei = re.search(r'Veicolo\s*:\s*([^\n]+)', testo_pulito, re.IGNORECASE)
+                    if m_vei:
+                        v_str = m_vei.group(1).strip()
+                        parts = v_str.split()
+                        if parts: st.session_state["val_marca_stampa"] = parts[0]
+                        st.session_state["val_versione_stampa"] = v_str
+                except: pass
 
-            # 5. PENALI BASE
-            if "500" in testo_pulito and ("Danni" in testo_pulito or "Kasko" in testo_pulito): st.session_state["val_p_kasko"] = "500 Euro"
-            elif "1000" in testo_pulito: st.session_state["val_p_kasko"] = "1000 Euro"
-            
-            if "250" in testo_pulito and "RCA" in testo_pulito: st.session_state["val_p_rca"] = "250 Euro"
-            elif "500" in testo_pulito and "RCA" in testo_pulito: st.session_state["val_p_rca"] = "500 Euro"
-            
-            if "10%" in testo_pulito: st.session_state["val_p_if"] = "10%"
-            elif "5%" in testo_pulito: st.session_state["val_p_if"] = "5%"
+            # 5. ESTRAZIONE PENALI
+            try:
+                if "500" in testo_pulito and ("Danni" in testo_pulito or "Kasko" in testo_pulito): st.session_state["val_p_kasko"] = "500 Euro"
+                elif "1000" in testo_pulito: st.session_state["val_p_kasko"] = "1000 Euro"
+                
+                if "250" in testo_pulito and "RCA" in testo_pulito: st.session_state["val_p_rca"] = "250 Euro"
+                elif "500" in testo_pulito and "RCA" in testo_pulito: st.session_state["val_p_rca"] = "500 Euro"
+                
+                if "10%" in testo_pulito: st.session_state["val_p_if"] = "10%"
+                elif "5%" in testo_pulito: st.session_state["val_p_if"] = "5%"
+            except: pass
 
-            st.sidebar.success("✅ Dati importati correttamente!")
+            st.sidebar.success("✅ Lettura completata! Dati estratti inseriti nel modulo.")
             st.rerun()
             
         except Exception as e:
-            # FIX: Mostra l'errore tecnico esatto per capire cosa fallisce
-            st.sidebar.error(f"Errore tecnico durante la lettura: {str(e)}")
+            st.sidebar.error(f"Errore caricamento file: assicurati sia un PDF valido.")
 
     st.sidebar.markdown("---")
     st.sidebar.header("📁 Database Listino")
