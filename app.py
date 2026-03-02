@@ -150,29 +150,42 @@ if check_password():
                         st.session_state["val_canone"] = prezzo_corretto
 
             elif "LEASYS" in testo_upper:
-                m_cli = re.search(r'(?:VENDITA|CLIENTE)\s+([A-Za-z0-9\s\&]+?)\s+(?:\+39|\d{9,10})', testo_flat, re.IGNORECASE)
-                if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("SRL", "").replace("SPA", "").strip()
+                # 1. Cliente: lo peschiamo tra la parola VENDITA e la parola MALDARIZZI
+                m_cli = re.search(r'VENDITA\s+(.*?)\s+MALDARIZZI', testo_flat, re.IGNORECASE)
+                if m_cli: 
+                    st.session_state["val_cliente"] = m_cli.group(1).replace("SRL", "").replace("SPA", "").strip()
 
-                for b in brands:
-                    if b in testo_upper:
-                        m_vei = re.search(fr'\b({b}\s+[A-Za-z0-9\s\.\-]{{5,80}}?)(?=\b24\b|\b36\b|\b48\b|\b60\b)', testo_flat, re.IGNORECASE)
-                        if m_vei:
-                            st.session_state["val_marca_stampa"] = b
-                            st.session_state["val_versione_stampa"] = m_vei.group(1).strip()
-                            break
+                # 2. Marca: peschiamo la parola subito dopo "Marca"
+                m_marca = re.search(r'Marca\s+([A-Za-z0-9\-]+)', testo_flat, re.IGNORECASE)
+                if m_marca:
+                    st.session_state["val_marca_stampa"] = m_marca.group(1).upper().strip()
+                
+                # 3. Versione: peschiamo tutto quello che c'è tra "Versione" e "Canone Totale"
+                m_ver = re.search(r'Versione\s+(.*?)\s+Canone Totale', testo_flat, re.IGNORECASE)
+                if m_ver:
+                    st.session_state["val_versione_stampa"] = m_ver.group(1).strip()
 
-                m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{2,3}\s*\d{3}|\d{4,7})\b', testo_flat)
-                if m_dur_km:
-                    st.session_state["val_durata"] = int(m_dur_km.group(1))
-                    km_tot = int(m_dur_km.group(2).replace(' ', ''))
+                # 4. Durata: peschiamo i numeri dopo "Durata"
+                m_dur = re.search(r'Durata\s+(\d{2,3})', testo_flat, re.IGNORECASE)
+                if m_dur:
+                    st.session_state["val_durata"] = int(m_dur.group(1))
+
+                # 5. KM Totali: peschiamo i numeri dopo "km totali" e calcoliamo l'annuale
+                m_km = re.search(r'km totali\s+([\d\s]+)\b', testo_flat, re.IGNORECASE)
+                if m_km:
+                    km_tot = int(m_km.group(1).replace(' ', ''))
                     if st.session_state["val_durata"] > 0:
                         st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-                m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
-                if m_can: 
-                    canoni_validi = [float(c.replace(',', '.')) for c in m_can if float(c.replace(',', '.')) < 3000]
-                    if len(canoni_validi) > 0:
-                        st.session_state["val_canone"] = max(canoni_validi)
+                # 6. Canone: peschiamo il primo importo in Euro dopo "Canone Totale" (Iva Esclusa)
+                m_can = re.search(r'Canone Totale\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                if m_can:
+                    st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
+                    
+                # 7. Anticipo: peschiamo il primo importo dopo "Anticipo"
+                m_ant = re.search(r'Anticipo\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                if m_ant:
+                    st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
 
             elif "ARVAL" in testo_upper:
                 m_cli = re.search(r'Ragione Sociale\s+([A-Za-z0-9\s\&]+?)\s+CF Cliente', testo_flat, re.IGNORECASE)
@@ -426,4 +439,5 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
