@@ -26,8 +26,12 @@ def check_password():
         return False
     return True
 
+# INIZIALIZZAZIONE LISTA PREVENTIVI IN MEMORIA
+if "lista_preventivi" not in st.session_state:
+    st.session_state["lista_preventivi"] = []
+
 if check_password():
-    # --- 2. CLASSE PDF "MALDARIZZI USATO LIBERO" ---
+    # --- 2. CLASSE PDF "MALDARIZZI MULTI-PAGE" ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -40,12 +44,14 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
+            # Sfondo dall'immagine
             if os.path.exists("slider-maldarizzirent.jpg"):
                 self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
             else:
                 self.set_fill_color(30, 30, 30)
                 self.rect(0, 0, 210, 297, 'F')
 
+            # Barra Superiore Nera
             self.set_fill_color(0, 0, 0)
             self.rect(0, 0, 210, 40, 'F')
             if os.path.exists("logo.png"):
@@ -62,6 +68,7 @@ if check_password():
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
     except: pass
 
+    # Sidebar
     st.sidebar.header("📁 Database")
     uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino", type=["xlsx"])
     if uploaded_excel:
@@ -86,26 +93,22 @@ if check_password():
     with c1:
         st.subheader("👤 Cliente")
         nome_cliente = st.text_input("Nome Cliente", "Gentile CLIENTE")
+        consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
         t_veicolo = st.radio("Stato Veicolo", ["Nuovo", "Usato"], horizontal=True)
         note_p = st.text_area("Note e optional", height=70)
     with c2:
         st.subheader("🚘 Veicolo")
-        
-        # --- LOGICA EDITABILE PER USATO ---
         if t_veicolo == "Usato":
             marca_stampa = st.text_input("Marca (es. BMW)")
-            # Il modello serve solo come riferimento nel nome file, ma non lo stampiamo per tua richiesta precedente
-            modello_stampa = st.text_input("Modello (es. X3)")
-            versione_stampa = st.text_area("Allestimento/Versione (es. xDrive 20d MSport 2021)")
+            versione_stampa = st.text_area("Allestimento/Versione (es. xDrive 20d MSport)")
         else:
             marca_sel = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
             modello_sel = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca_sel]['Vehicle Set description'].unique().tolist()))
             versione_sel = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca_sel) & (df['Vehicle Set description']==modello_sel)]['Jato Product Description'].unique().tolist()))
             marca_stampa = marca_sel
-            modello_stampa = modello_sel
             versione_stampa = versione_sel
         
-        foto_m = st.file_uploader("Foto Auto", type=["jpg", "png", "jpeg"])
+        foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
     st.subheader("🛡️ Servizi e Penali")
@@ -134,106 +137,128 @@ if check_password():
     with n3: durata = st.selectbox("Durata (Mesi)", [24, 36, 48, 60], index=1)
     with n4: km = st.number_input("Km/Anno", value=15000)
 
-    # --- GENERAZIONE PDF ---
-    if st.button("🚀 GENERA PREVENTIVO"):
-        # PIOGGIA DI AUTO
-        st.markdown("""
-            <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
-                <style>
-                    @keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
-                    .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }
-                </style>
-                <div class="car" style="left: 10%;">🚗</div><div class="car" style="left: 30%;">🚙</div><div class="car" style="left: 50%;">🚗</div><div class="car" style="left: 70%;">🚙</div><div class="car" style="left: 90%;">🚗</div>
-            </div>""", unsafe_allow_html=True)
+    st.markdown("---")
+    # --- LOGICA MULTI-PREVENTIVO ---
+    if st.button("➕ AGGIUNGI AL DOCUMENTO"):
+        # Salva la foto in byte se presente, altrimenti None
+        foto_bytes = foto_m.getvalue() if foto_m else None
+        
+        # Crea un dizionario con tutti i dati del veicolo corrente
+        auto_aggiunta = {
+            "cliente": nome_cliente, "consegna": consegna, "t_veicolo": t_veicolo, "note": note_p,
+            "marca": marca_stampa, "versione": versione_stampa, "foto_bytes": foto_bytes,
+            "p_rca": p_rca, "p_if": p_if, "p_kasko": p_kasko, "infort": infort, "g_num": g_num,
+            "canone": canone, "anticipo": anticipo, "durata": durata, "km": km
+        }
+        st.session_state["lista_preventivi"].append(auto_aggiunta)
+        st.success(f"✅ {marca_stampa} aggiunto al documento! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
 
-        pdf = MaldarizziPDF()
-        pdf.add_page()
-        pdf.set_text_color(255, 255, 255)
+    # MOSTRA IL CARRELLO E IL TASTO DI STAMPA
+    if len(st.session_state["lista_preventivi"]) > 0:
+        st.info(f"🛒 Hai aggiunto **{len(st.session_state['lista_preventivi'])}** veicoli al preventivo congiunto.")
         
-        data_it = datetime.now().strftime('%d %B %Y').upper()
-        pdf.set_y(58)
-        pdf.set_font(pdf.f_f, "", 9)
-        pdf.cell(0, 5, f"{data_it} - VALIDITÀ {g_validita} GIORNI", align="C", ln=True)
-        pdf.set_font(pdf.f_f, "B", 12)
-        pdf.cell(0, 8, f"SPETT.LE {nome_cliente.upper()}", align="C", ln=True)
+        col_stampa, col_svuota = st.columns([2, 1])
+        with col_svuota:
+            if st.button("🗑️ Svuota Lista"):
+                st.session_state["lista_preventivi"] = []
+                st.rerun()
+                
+        with col_stampa:
+            if st.button("🚀 STAMPA PREVENTIVO UNICO (PDF MULTIPLO)"):
+                
+                # Pioggia di auto
+                st.markdown("""
+                    <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
+                        <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
+                        <div class="car" style="left: 10%;">🚗</div><div class="car" style="left: 30%;">🚙</div><div class="car" style="left: 50%;">🚗</div><div class="car" style="left: 70%;">🚙</div><div class="car" style="left: 90%;">🚗</div>
+                    </div>""", unsafe_allow_html=True)
 
-        # BLOCCO VEICOLO (SX) E FOTO (DX)
-        y_pos = 85
-        f_path = "tmp.png"
-        if foto_m:
-            with open(f_path, "wb") as f: f.write(foto_m.getbuffer())
-        else:
-            f_path = f"foto_vetture/{marca_stampa.upper()}.jpg"
-        
-        if os.path.exists(f_path):
-            pdf.image(f_path, 110, y_pos, 90)
-        
-        pdf.set_xy(15, y_pos)
-        pdf.set_font(pdf.f_f, "B", 20)
-        pdf.multi_cell(90, 8, marca_stampa.upper())
-        pdf.set_x(15)
-        pdf.set_font(pdf.f_f, "", 11)
-        pdf.multi_cell(90, 5, versione_stampa)
-        
-        pdf.ln(4)
-        pdf.set_font(pdf.f_f, "B", 10)
-        pdf.set_x(15)
-        pdf.cell(90, 6, f"STATO: {t_veicolo.upper()}", ln=True)
-        pdf.set_x(15)
-        pdf.cell(90, 6, f"DURATA CONTRATTO: {durata} MESI", ln=True)
-        pdf.set_x(15)
-        pdf.cell(90, 6, f"KM/ANNO: {km:,} KM".replace(",", "."), ln=True)
+                pdf = MaldarizziPDF()
+                data_it = datetime.now().strftime('%d %B %Y').upper()
+                
+                # CICLO SU TUTTE LE AUTO AGGIUNTE
+                for p in st.session_state["lista_preventivi"]:
+                    pdf.add_page()
+                    pdf.set_text_color(255, 255, 255)
+                    
+                    pdf.set_y(58)
+                    pdf.set_font(pdf.f_f, "", 9)
+                    pdf.cell(0, 5, f"{data_it} - VALIDITÀ {g_validita} GIORNI", align="C", ln=True)
+                    pdf.set_font(pdf.f_f, "B", 12)
+                    pdf.cell(0, 8, f"SPETT.LE {p['cliente'].upper()}", align="C", ln=True)
 
-        # SERVIZI
-        pdf.set_y(155)
-        pdf.set_font(pdf.f_f, "B", 11)
-        pdf.cell(0, 7, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
-        pdf.set_font(pdf.f_f, "", 9)
-        
-        serv_list = [
-            f"RCA (Franchigia {p_rca})", 
-            f"Incendio/Furto (Franchigia {p_if})",
-            f"Danni/Kasko (Franchigia {p_kasko})",
-            "Manutenzione Ordinaria/Straordinaria",
-            "Assistenza Stradale H24"
-        ]
-        if g_num: serv_list.append(f"Gomme: {g_num}")
-        if infort: serv_list.append("Infortunio Conducente (PAI)")
-        
-        pdf.multi_cell(0, 5, " | ".join(serv_list), align="C")
-        
-        pdf.ln(2)
-        pdf.set_font(pdf.f_f, "I", 8)
-        pdf.set_text_color(220, 220, 220)
-        pdf.cell(0, 5, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.", align="C", ln=True)
+                    y_pos = 85
+                    f_path = "tmp_multi.png"
+                    if p["foto_bytes"]:
+                        with open(f_path, "wb") as f: f.write(p["foto_bytes"])
+                    else:
+                        f_path = f"foto_vetture/{p['marca'].upper()}.jpg"
+                    
+                    if os.path.exists(f_path):
+                        pdf.image(f_path, 110, y_pos, 90)
+                    
+                    pdf.set_xy(15, y_pos)
+                    pdf.set_font(pdf.f_f, "B", 20)
+                    pdf.multi_cell(90, 8, p['marca'].upper())
+                    pdf.set_x(15)
+                    pdf.set_font(pdf.f_f, "", 11)
+                    pdf.multi_cell(90, 5, p['versione'])
+                    
+                    pdf.ln(4)
+                    pdf.set_font(pdf.f_f, "B", 10)
+                    pdf.set_x(15)
+                    pdf.cell(90, 6, f"STATO: {p['t_veicolo'].upper()} ({p['consegna']})", ln=True)
+                    pdf.set_x(15)
+                    pdf.cell(90, 6, f"DURATA CONTRATTO: {p['durata']} MESI", ln=True)
+                    pdf.set_x(15)
+                    pdf.cell(90, 6, f"KM/ANNO: {p['km']:,} KM".replace(",", "."), ln=True)
 
-        # PREZZO
-        pdf.set_y(210)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(pdf.f_f, "B", 28)
-        pdf.cell(0, 15, f"EURO {canone}/MESE", align="C", ln=True)
-        pdf.set_font(pdf.f_f, "B", 14)
-        pdf.cell(0, 8, f"Anticipo: Euro {anticipo} (Iva Esclusa)", align="C", ln=True)
+                    pdf.set_y(155)
+                    pdf.set_font(pdf.f_f, "B", 11)
+                    pdf.cell(0, 7, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
+                    pdf.set_font(pdf.f_f, "", 9)
+                    
+                    serv_list = [
+                        f"RCA (Franchigia {p['p_rca']})", 
+                        f"Incendio/Furto (Franchigia {p['p_if']})",
+                        f"Danni/Kasko (Franchigia {p['p_kasko']})",
+                        "Manutenzione Ordinaria/Straordinaria",
+                        "Assistenza Stradale H24"
+                    ]
+                    if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
+                    if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
+                    
+                    pdf.multi_cell(0, 5, " | ".join(serv_list), align="C")
+                    
+                    pdf.ln(2)
+                    pdf.set_font(pdf.f_f, "I", 8)
+                    pdf.set_text_color(220, 220, 220)
+                    pdf.cell(0, 5, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.", align="C", ln=True)
 
-        if note_p:
-            pdf.ln(2)
-            pdf.set_font(pdf.f_f, "I", 9)
-            pdf.multi_cell(0, 5, f"Note: {note_p}", align="C")
+                    pdf.set_y(210)
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.set_font(pdf.f_f, "B", 28)
+                    pdf.cell(0, 15, f"EURO {p['canone']}/MESE", align="C", ln=True)
+                    pdf.set_font(pdf.f_f, "B", 14)
+                    pdf.cell(0, 8, f"Anticipo: Euro {p['anticipo']} (Iva Esclusa)", align="C", ln=True)
 
-        # BARRA INFERIORE NERA
-        pdf.set_fill_color(0, 0, 0)
-        pdf.rect(0, 260, 210, 37, 'F')
-        
-        pdf.set_y(265)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font(pdf.f_f, "B", 10)
-        pdf.cell(0, 6, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
-        pdf.set_font(pdf.f_f, "", 9)
-        pdf.cell(0, 5, f"E-mail: {email_cons} | Tel: {tel_cons}", align="C", ln=True)
-        pdf.set_font(pdf.f_f, "I", 7)
-        pdf.cell(0, 8, "MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/", align="C", ln=True)
+                    if p['note']:
+                        pdf.ln(2)
+                        pdf.set_font(pdf.f_f, "I", 9)
+                        pdf.multi_cell(0, 5, f"Note: {p['note']}", align="C")
 
-        pdf.output("preventivo.pdf")
-        st.success("Preventivo Generato!")
-        with open("preventivo.pdf", "rb") as f:
-            st.download_button("📩 SCARICA", f, f"Offerta_{marca_stampa}.pdf", key=f"dl_{datetime.now().timestamp()}")
+                    # BARRA INFERIORE NERA
+                    pdf.set_fill_color(0, 0, 0)
+                    pdf.rect(0, 260, 210, 37, 'F')
+                    pdf.set_y(265)
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.set_font(pdf.f_f, "B", 10)
+                    pdf.cell(0, 6, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
+                    pdf.set_font(pdf.f_f, "", 9)
+                    pdf.cell(0, 5, f"E-mail: {email_cons} | Tel: {tel_cons}", align="C", ln=True)
+                    pdf.set_font(pdf.f_f, "I", 7)
+                    pdf.cell(0, 8, "MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/", align="C", ln=True)
+
+                pdf.output("preventivo_multiplo.pdf")
+                with open("preventivo_multiplo.pdf", "rb") as f:
+                    st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla_{nome_cliente.replace(' ', '_')}.pdf", key="dl_multi")
