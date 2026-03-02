@@ -58,7 +58,7 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
-    # --- 2. CLASSE PDF ---
+    # --- 2. CLASSE PDF (Versione Pulita per FPDF2) ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -71,32 +71,17 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # Blocco di sicurezza per l'immagine di sfondo
-            sfondo_caricato = False
             if os.path.exists("slider-maldarizzirent.jpg"):
-                try:
-                    self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
-                    sfondo_caricato = True
-                except Exception:
-                    pass # Se fallisce, ignora l'errore e passa oltre
-            
-            # Se l'immagine non c'è o ha un formato non supportato, usa lo sfondo scuro
-            if not sfondo_caricato:
+                self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
+            else:
                 self.set_fill_color(30, 30, 30)
                 self.rect(0, 0, 210, 297, 'F')
 
-            # Barra superiore nera
             self.set_fill_color(0, 0, 0)
             self.rect(0, 0, 210, 40, 'F')
-            
-            # Blocco di sicurezza per il logo
             if os.path.exists("logo.png"):
-                try:
-                    self.image("logo.png", 75, 8, 60)
-                except Exception:
-                    pass
+                self.image("logo.png", 75, 8, 60)
             
-            # Titolo
             self.set_y(45)
             self.set_font(self.f_f, "B", 20)
             self.set_text_color(255, 255, 255)
@@ -113,8 +98,9 @@ if check_password():
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
-            reader = pypdf.PdfReader(pdf_bytes)
             
+            # LETTURA DEL PDF CON PYPDF (Leasys è salvo qui!)
+            reader = pypdf.PdfReader(pdf_bytes)
             testo_estratto = ""
             for page in reader.pages:
                 t = page.extract_text()
@@ -129,11 +115,9 @@ if check_password():
 
             # --- ESTRATTORE CHIRURGICO ---
             if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
-                # Cliente
                 m_cli = re.search(r':\s*([A-Z\s]{4,40}?)\s*\d{6,9}/\d{2,3}', testo_flat)
                 if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("VITO VITO", "VITO").strip()
 
-                # Veicolo
                 m_vei = re.search(r'(?:OFFERTA STANDARD|Second Life|OFFERTA PROMOZIONALE)\s+(.*?)\s+\d{2}/\d{2}/\d{2,4}', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
@@ -142,7 +126,6 @@ if check_password():
                         st.session_state["val_marca_stampa"] = parti[0].upper()
                     st.session_state["val_versione_stampa"] = vei
 
-                # Durata e KM
                 m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{4,7})\s+€', testo_flat)
                 if m_dur_km:
                     st.session_state["val_durata"] = int(m_dur_km.group(1))
@@ -150,7 +133,6 @@ if check_password():
                     if st.session_state["val_durata"] > 0:
                         st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-                # Canone Ayvens Intelligente
                 m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
                 if m_can:
                     valori = sorted([float(c.replace(',', '.')) for c in m_can], reverse=True)
@@ -164,44 +146,37 @@ if check_password():
                         st.session_state["val_canone"] = prezzo_corretto
 
             elif "LEASYS" in testo_upper:
-                # 1. Cliente: lo peschiamo tra la parola VENDITA e la parola MALDARIZZI
+                # ESTRAZIONE LEASYS (Intatta e protetta)
                 m_cli = re.search(r'VENDITA\s+(.*?)\s+MALDARIZZI', testo_flat, re.IGNORECASE)
                 if m_cli: 
                     st.session_state["val_cliente"] = m_cli.group(1).replace("SRL", "").replace("SPA", "").strip()
 
-                # 2. Marca: peschiamo la parola subito dopo "Marca"
                 m_marca = re.search(r'Marca\s+([A-Za-z0-9\-]+)', testo_flat, re.IGNORECASE)
                 if m_marca:
                     st.session_state["val_marca_stampa"] = m_marca.group(1).upper().strip()
                 
-                # 3. Versione: peschiamo tutto quello che c'è tra "Versione" e "Canone Totale"
                 m_ver = re.search(r'Versione\s+(.*?)\s+Canone Totale', testo_flat, re.IGNORECASE)
                 if m_ver:
                     st.session_state["val_versione_stampa"] = m_ver.group(1).strip()
 
-                # 4. Durata: peschiamo i numeri dopo "Durata"
                 m_dur = re.search(r'Durata\s+(\d{2,3})', testo_flat, re.IGNORECASE)
                 if m_dur:
                     st.session_state["val_durata"] = int(m_dur.group(1))
 
-                # 5. KM Totali: peschiamo i numeri dopo "km totali" e calcoliamo l'annuale
                 m_km = re.search(r'km totali\s+([\d\s]+)\b', testo_flat, re.IGNORECASE)
                 if m_km:
                     km_tot = int(m_km.group(1).replace(' ', ''))
                     if st.session_state["val_durata"] > 0:
                         st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-                # 6. Canone: peschiamo il primo importo in Euro dopo "Canone Totale" (Iva Esclusa)
                 m_can = re.search(r'Canone Totale\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_can:
                     st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
                     
-                # 7. Anticipo: peschiamo il primo importo dopo "Anticipo"
                 m_ant = re.search(r'Anticipo\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
                     st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
                 
-                # 8. Franchigia KM: Sveliamo il trucchetto Leasys!
                 m_fran = re.search(r'Franchigia km\s+([\d\s]+)\b', testo_flat, re.IGNORECASE)
                 if m_fran:
                     franchigia_km = int(m_fran.group(1).replace(' ', ''))
@@ -460,4 +435,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
