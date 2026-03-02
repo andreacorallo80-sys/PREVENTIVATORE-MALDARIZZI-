@@ -27,7 +27,7 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CLASSE PDF "MALDARIZZI WHITE TEXT EDITION" ---
+    # --- 2. CLASSE PDF "MALDARIZZI FINAL WHITE" ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -40,11 +40,11 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # SFONDO DALL'IMMAGINE
+            # SFONDO DALL'IMMAGINE SLIDER
             if os.path.exists("slider-maldarizzirent.jpg"):
                 self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
             else:
-                self.set_fill_color(30, 30, 30) # Sfondo scuro di backup se manca immagine
+                self.set_fill_color(30, 30, 30)
                 self.rect(0, 0, 210, 297, 'F')
 
             # BARRA SUPERIORE NERA
@@ -71,7 +71,7 @@ if check_password():
         st.sidebar.success("Database aggiornato!")
 
     if not os.path.exists("dati.xlsx"):
-        st.error("Carica il file dati.xlsx")
+        st.error("Carica dati.xlsx")
         st.stop()
 
     excel = pd.ExcelFile("dati.xlsx")
@@ -80,7 +80,7 @@ if check_password():
     
     st.sidebar.markdown("---")
     g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
-    nome_cons = st.sidebar.text_input("Nome", "GRAZIA DEL VECCHIO")
+    nome_cons = st.sidebar.text_input("Consulente", "GRAZIA DEL VECCHIO")
     email_cons = st.sidebar.text_input("Email", "g.delvecchio@maldarizzi.com")
     tel_cons = st.sidebar.text_input("WhatsApp", "080 5322212")
 
@@ -88,14 +88,19 @@ if check_password():
     with c1:
         st.subheader("👤 Cliente")
         nome_cliente = st.text_input("Nome Cliente", "Gentile CLIENTE")
-        consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
+        t_veicolo = st.radio("Stato", ["Nuovo", "Usato"], horizontal=True)
         note_p = st.text_area("Note e optional", height=70)
     with c2:
         st.subheader("🚘 Veicolo")
-        t_veicolo = st.radio("Stato", ["Nuovo", "Usato"], horizontal=True)
         marca = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
         modello_f = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca]['Vehicle Set description'].unique().tolist()))
-        versione = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca) & (df['Vehicle Set description']==modello_f)]['Jato Product Description'].unique().tolist()))
+        
+        # --- DESCRIZIONE EDITABILE PER USATO ---
+        if t_veicolo == "Usato":
+            versione = st.text_area("Descrizione Mezzo Usato", "Inserisci KM, Anno e Allestimento...")
+        else:
+            versione = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca) & (df['Vehicle Set description']==modello_f)]['Jato Product Description'].unique().tolist()))
+        
         foto_m = st.file_uploader("Foto Auto", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
@@ -108,7 +113,7 @@ if check_password():
         p_kasko = st.selectbox("Penale Danni/Kasko", ["0 Euro", "250 Euro", "500 Euro", "1000 Euro"])
         infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
     with s3:
-        usa_gomme = st.checkbox("Pneumatici Inclusi?", value=True)
+        usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
         g_num = "ILLIMITATE"
         if usa_gomme:
             g_tipo = st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True)
@@ -127,9 +132,19 @@ if check_password():
 
     # --- GENERAZIONE PDF ---
     if st.button("🚀 GENERA PREVENTIVO"):
+        # --- PIOGGIA DI AUTO ---
+        st.markdown("""
+            <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
+                <style>
+                    @keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } }
+                    .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }
+                </style>
+                <div class="car" style="left: 10%;">🚗</div><div class="car" style="left: 30%;">🚙</div><div class="car" style="left: 50%;">🚗</div><div class="car" style="left: 70%;">🚙</div><div class="car" style="left: 90%;">🚗</div>
+            </div>""", unsafe_allow_html=True)
+
         pdf = MaldarizziPDF()
         pdf.add_page()
-        pdf.set_text_color(255, 255, 255) # SETTA TUTTO IL TESTO IN BIANCO
+        pdf.set_text_color(255, 255, 255) # TESTO BIANCO
         
         # Data
         data_it = datetime.now().strftime('%d %B %Y').upper()
@@ -160,7 +175,7 @@ if check_password():
         pdf.ln(4)
         pdf.set_font(pdf.f_f, "B", 10)
         pdf.set_x(15)
-        pdf.cell(90, 6, f"STATO: {t_veicolo.upper()} ({consegna})", ln=True)
+        pdf.cell(90, 6, f"STATO: {t_veicolo.upper()}", ln=True)
         pdf.set_x(15)
         pdf.cell(90, 6, f"DURATA CONTRATTO: {durata} MESI", ln=True)
         pdf.set_x(15)
@@ -187,12 +202,12 @@ if check_password():
         # Disclaimer
         pdf.ln(2)
         pdf.set_font(pdf.f_f, "I", 8)
-        pdf.set_text_color(200, 200, 200) # Grigio molto chiaro per il disclaimer
+        pdf.set_text_color(220, 220, 220)
         pdf.cell(0, 5, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.", align="C", ln=True)
 
         # PREZZO
         pdf.set_y(210)
-        pdf.set_text_color(255, 255, 255) # Riconferma Bianco
+        pdf.set_text_color(255, 255, 255)
         pdf.set_font(pdf.f_f, "B", 28)
         pdf.cell(0, 15, f"EURO {canone}/MESE", align="C", ln=True)
         pdf.set_font(pdf.f_f, "B", 14)
@@ -217,6 +232,6 @@ if check_password():
         pdf.cell(0, 8, "MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/", align="C", ln=True)
 
         pdf.output("preventivo.pdf")
-        st.success("Preventivo Generato con testo Bianco!")
+        st.success("Preventivo Generato!")
         with open("preventivo.pdf", "rb") as f:
             st.download_button("📩 SCARICA", f, f"Offerta_{marca}.pdf", key=f"dl_{datetime.now().timestamp()}")
