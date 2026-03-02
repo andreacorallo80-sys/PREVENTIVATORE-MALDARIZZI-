@@ -42,6 +42,7 @@ if "val_versione_stampa" not in st.session_state: st.session_state["val_versione
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
+if "debug_text" not in st.session_state: st.session_state["debug_text"] = "" # NUOVA MEMORIA PER IL DEBUG
 
 if check_password():
     # --- 2. CLASSE PDF ---
@@ -85,7 +86,6 @@ if check_password():
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         testo_pulito = ""
         try:
-            # FIX MEMORIA: Uso getvalue() per non perdere il file
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
             reader = PyPDF2.PdfReader(pdf_bytes)
             testo_estratto = ""
@@ -96,6 +96,8 @@ if check_password():
             testo_pulito = testo_estratto.replace('\n', ' ').replace('\r', ' ')
             testo_upper = testo_pulito.upper()
             
+            # SALVO IL TESTO IN MEMORIA PER POTERLO VEDERE SEMPRE
+            st.session_state["debug_text"] = testo_pulito
             st.session_state["val_input_mode"] = "Testo Libero"
 
             # --- ESTRATTORE SPECIFICO PER SOCIETÀ ---
@@ -135,7 +137,7 @@ if check_password():
                 m_vei = re.search(r'Versione\s+Durata\s+km totall(.*?)\b(?:24|36|48|60)\b', testo_pulito, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
-                    vei = re.sub(r'\s+', ' ', vei) # Pulisce gli spazi extra
+                    vei = re.sub(r'\s+', ' ', vei)
                     st.session_state["val_marca_stampa"] = vei.split()[0] if vei else ""
                     st.session_state["val_versione_stampa"] = vei
 
@@ -164,9 +166,13 @@ if check_password():
             st.rerun()
             
         except Exception as e:
+            st.session_state["debug_text"] = testo_pulito if testo_pulito else f"Errore: {str(e)}"
             st.sidebar.error(f"Errore tecnico: {str(e)}")
-            with st.sidebar.expander("🛠️ Mostra Testo Letto dal PDF (Debug)"):
-                st.write(testo_pulito if testo_pulito else "Nessun testo letto.")
+
+    # MOSTRA SEMPRE IL TESTO DEBUG SE PRESENTE
+    if st.session_state.get("debug_text"):
+        with st.sidebar.expander("🛠️ Mostra Testo Letto dal PDF (Debug)"):
+            st.write(st.session_state["debug_text"])
 
     st.sidebar.markdown("---")
     st.sidebar.header("📁 Database Listino")
@@ -215,7 +221,7 @@ if check_password():
         foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
-    st.subheader("🛡️ Servizi e Penali")
+    st.subheader("🔧 Servizi e Penali")
     s1, s2, s3 = st.columns(3)
     
     with s1:
@@ -328,9 +334,9 @@ if check_password():
                     pdf.set_font(pdf.f_f, "", 9)
                     
                     serv_list = [
-                        f"RCA (Franchigia {p['p_rca']})", 
-                        f"Incendio/Furto (Franchigia {p['p_if']})",
-                        f"Danni/Kasko (Franchigia {p['p_kasko']})",
+                        f"RCA (Penale {p['p_rca']})", 
+                        f"Incendio/Furto (Penale {p['p_if']})",
+                        f"Danni/Kasko (Penale {p['p_kasko']})",
                         "Manutenzione Ordinaria/Straordinaria",
                         "Assistenza Stradale H24"
                     ]
