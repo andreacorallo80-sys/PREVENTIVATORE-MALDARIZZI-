@@ -1,7 +1,8 @@
+ import streamlit as st
 import pandas as pd
 import os
 import re
-import pypdf  
+import pypdf
 import io
 from fpdf import FPDF
 from datetime import datetime
@@ -96,7 +97,10 @@ if check_password():
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
+            
+            # QUI USIAMO IL NUOVO MOTORE PYPDF
             reader = pypdf.PdfReader(pdf_bytes)
+            
             testo_estratto = ""
             for page in reader.pages:
                 t = page.extract_text()
@@ -115,12 +119,12 @@ if check_password():
                 m_cli = re.search(r':\s*([A-Z\s]{4,40}?)\s*\d{6,9}/\d{2,3}', testo_flat)
                 if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("VITO VITO", "VITO").strip()
 
-                # Veicolo: regex più inclusiva che prende anche caratteri speciali e minuscole
+                # Veicolo
                 m_vei = re.search(r'(?:OFFERTA STANDARD|Second Life|OFFERTA PROMOZIONALE)\s+(.*?)\s+\d{2}/\d{2}/\d{2,4}', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
                     parti = vei.split()
-                    if len(parti) > 0: # Controllo di sicurezza anti IndexError
+                    if len(parti) > 0:
                         st.session_state["val_marca_stampa"] = parti[0].upper()
                     st.session_state["val_versione_stampa"] = vei
 
@@ -136,7 +140,7 @@ if check_password():
                 m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
                 if m_can:
                     valori = sorted([float(c.replace(',', '.')) for c in m_can], reverse=True)
-                    if len(valori) > 0: # Controllo di sicurezza anti IndexError
+                    if len(valori) > 0:
                         massimo = valori[0]
                         prezzo_corretto = massimo
                         for v in valori:
@@ -166,7 +170,6 @@ if check_password():
 
                 m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
                 if m_can: 
-                    # Controllo di sicurezza anti IndexError e ValueError sulle liste
                     canoni_validi = [float(c.replace(',', '.')) for c in m_can if float(c.replace(',', '.')) < 3000]
                     if len(canoni_validi) > 0:
                         st.session_state["val_canone"] = max(canoni_validi)
@@ -179,7 +182,7 @@ if check_password():
                 if m_vei:
                     vei = m_vei.group(1).strip()
                     parti = vei.split()
-                    if len(parti) > 0: # Controllo di sicurezza anti IndexError
+                    if len(parti) > 0:
                         st.session_state["val_marca_stampa"] = parti[0]
                     st.session_state["val_versione_stampa"] = vei
 
@@ -201,7 +204,7 @@ if check_password():
             # 5. PENALI BASE COMUNI
             if "500" in testo_flat and ("Danni" in testo_flat or "Kasko" in testo_flat): st.session_state["val_p_kasko"] = "500 Euro"
             elif "1000" in testo_flat: st.session_state["val_p_kasko"] = "1000 Euro"
-            elif "249" in testo_flat: st.session_state["val_p_kasko"] = "250 Euro" # Ayvens Danni
+            elif "249" in testo_flat: st.session_state["val_p_kasko"] = "250 Euro" 
             
             if "250" in testo_flat and "RCA" in testo_flat: st.session_state["val_p_rca"] = "250 Euro"
             elif "500" in testo_flat and "RCA" in testo_flat: st.session_state["val_p_rca"] = "500 Euro"
@@ -423,6 +426,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
-
