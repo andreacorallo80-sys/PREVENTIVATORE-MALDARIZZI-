@@ -112,39 +112,34 @@ if check_password():
 
             # --- ESTRATTORE CHIRURGICO ---
             if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
-                # Cliente: pesca i nomi prima del codice numerico con lo slash (es. 57987862/001)
+                # Cliente
                 m_cli = re.search(r':\s*([A-Z\s]{4,40}?)\s*\d{6,9}/\d{2,3}', testo_flat)
                 if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("VITO VITO", "VITO").strip()
 
-                # Veicolo: si trova sempre tra "OFFERTA STANDARD" o "Second Life" e una Data
+                # Veicolo
                 m_vei = re.search(r'(?:OFFERTA STANDARD|Second Life|OFFERTA PROMOZIONALE)\s+([A-Z0-9\s\.\-\(\)]+?)\s+\d{2}/\d{2}/\d{4}', testo_flat)
                 if m_vei:
                     vei = m_vei.group(1).strip()
                     st.session_state["val_marca_stampa"] = vei.split()[0]
                     st.session_state["val_versione_stampa"] = vei
 
-                # Durata e KM: pesca la stringa precisa tipo "48 60000 €"
+                # Durata e KM
                 m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{4,7})\s+€', testo_flat)
                 if m_dur_km:
                     st.session_state["val_durata"] = int(m_dur_km.group(1))
                     km_tot = int(m_dur_km.group(2))
                     st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-               # Estrazione Canone Ayvens intelligente
+                # Canone Ayvens intelligente (scarta il prezzo ivato)
                 m_can = re.findall(r'€\s*(\d{2,4}\.\d{2})', testo_flat)
                 if m_can:
-                    # Ordiniamo i prezzi dal più grande al più piccolo
                     valori = sorted([float(c) for c in m_can], reverse=True)
                     massimo = valori[0]
                     prezzo_corretto = massimo
-                    
-                    # Controlliamo se il prezzo più alto è in realtà il prezzo ivato (es. 464 = 380 * 1.22)
                     for v in valori:
-                        # Se un numero moltiplicato per l'IVA del 22% è uguale (circa) al massimo, allora è il nostro canone!
                         if abs(massimo - (v * 1.22)) < 1.0: 
                             prezzo_corretto = v
                             break
-                            
                     st.session_state["val_canone"] = prezzo_corretto
 
             elif "LEASYS" in testo_upper:
@@ -204,8 +199,8 @@ if check_password():
             st.sidebar.success("✅ Dati estratti chirurgicamente!")
             st.rerun()
             
-    except Exception as e:
-            # Abbiamo cambiato 'testo_pulito' in 'testo_flat'
+        except Exception as e:
+            # Corretto l'errore NameError cambiando testo_pulito in testo_flat
             st.session_state["debug_text"] = testo_flat if 'testo_flat' in locals() else f"Errore: {str(e)}"
             st.sidebar.error(f"Errore durante l'analisi del PDF: {str(e)}")
 
@@ -416,5 +411,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
