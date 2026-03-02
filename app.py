@@ -27,7 +27,7 @@ def check_password():
     return True
 
 if check_password():
-    # --- 2. CLASSE PDF "MALDARIZZI FULL EDITION" ---
+    # --- 2. CLASSE PDF "MALDARIZZI WHITE TEXT EDITION" ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -40,11 +40,11 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # SFONDO DALL'IMMAGINE CARICATA
+            # SFONDO DALL'IMMAGINE
             if os.path.exists("slider-maldarizzirent.jpg"):
                 self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
             else:
-                self.set_fill_color(255, 255, 255)
+                self.set_fill_color(30, 30, 30) # Sfondo scuro di backup se manca immagine
                 self.rect(0, 0, 210, 297, 'F')
 
             # BARRA SUPERIORE NERA
@@ -55,7 +55,7 @@ if check_password():
             
             self.set_y(45)
             self.set_font(self.f_f, "B", 20)
-            self.set_text_color(0, 0, 0)
+            self.set_text_color(255, 255, 255) # TESTO BIANCO
             self.cell(0, 10, "IL TUO PREVENTIVO", align="C", ln=True)
 
     # --- 3. INTERFACCIA STREAMLIT ---
@@ -64,7 +64,6 @@ if check_password():
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
     except: pass
 
-    # Sidebar: Database e Consulente
     st.sidebar.header("📁 Database")
     uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino", type=["xlsx"])
     if uploaded_excel:
@@ -130,9 +129,9 @@ if check_password():
     if st.button("🚀 GENERA PREVENTIVO"):
         pdf = MaldarizziPDF()
         pdf.add_page()
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(255, 255, 255) # SETTA TUTTO IL TESTO IN BIANCO
         
-        # Data Italiana
+        # Data
         data_it = datetime.now().strftime('%d %B %Y').upper()
         pdf.set_y(58)
         pdf.set_font(pdf.f_f, "", 9)
@@ -185,15 +184,15 @@ if check_password():
         
         pdf.multi_cell(0, 5, " | ".join(serv_list), align="C")
         
-        # Disclaimer Foto
+        # Disclaimer
         pdf.ln(2)
         pdf.set_font(pdf.f_f, "I", 8)
-        pdf.set_text_color(100, 100, 100)
+        pdf.set_text_color(200, 200, 200) # Grigio molto chiaro per il disclaimer
         pdf.cell(0, 5, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.", align="C", ln=True)
 
         # PREZZO
         pdf.set_y(210)
-        pdf.set_text_color(0, 0, 0)
+        pdf.set_text_color(255, 255, 255) # Riconferma Bianco
         pdf.set_font(pdf.f_f, "B", 28)
         pdf.cell(0, 15, f"EURO {canone}/MESE", align="C", ln=True)
         pdf.set_font(pdf.f_f, "B", 14)
@@ -218,6 +217,6 @@ if check_password():
         pdf.cell(0, 8, "MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/", align="C", ln=True)
 
         pdf.output("preventivo.pdf")
-        st.success("Preventivo Generato!")
+        st.success("Preventivo Generato con testo Bianco!")
         with open("preventivo.pdf", "rb") as f:
             st.download_button("📩 SCARICA", f, f"Offerta_{marca}.pdf", key=f"dl_{datetime.now().timestamp()}")
