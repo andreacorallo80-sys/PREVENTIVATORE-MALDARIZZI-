@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import re
 import PyPDF2
+import io
 from fpdf import FPDF
 from datetime import datetime
 import locale
@@ -35,7 +36,7 @@ if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
 if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
 if "val_anticipo" not in st.session_state: st.session_state["val_anticipo"] = 0.0
 if "val_cliente" not in st.session_state: st.session_state["val_cliente"] = "Gentile CLIENTE"
-if "val_input_mode" not in st.session_state: st.session_state["val_input_mode"] = "Da Listino" # NUOVA LOGICA
+if "val_input_mode" not in st.session_state: st.session_state["val_input_mode"] = "Da Listino"
 if "val_marca_stampa" not in st.session_state: st.session_state["val_marca_stampa"] = ""
 if "val_versione_stampa" not in st.session_state: st.session_state["val_versione_stampa"] = ""
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
@@ -43,7 +44,7 @@ if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
 
 if check_password():
-    # --- 2. CLASSE PDF "MALDARIZZI MULTI-PAGE" ---
+    # --- 2. CLASSE PDF ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -83,17 +84,21 @@ if check_password():
     
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
-            reader = PyPDF2.PdfReader(pdf_portale)
+            # FIX: Uso io.BytesIO per gestire il file caricato ed evito errori di memoria
+            pdf_bytes = io.BytesIO(pdf_portale.read())
+            reader = PyPDF2.PdfReader(pdf_bytes)
             testo_estratto = ""
             for page in reader.pages:
-                testo_estratto += page.extract_text() + " \n "
+                testo = page.extract_text()
+                if testo: # FIX: Protezione contro pagine vuote o immagini
+                    testo_estratto += testo + " \n "
             
             testo_pulito = testo_estratto.replace('\r', ' ')
+            st.session_state["val_input_mode"] = "Testo Libero"
             
             # 1. DURATA
             m_dur = re.search(r'(24|36|48|60)\s*mesi', testo_pulito, re.IGNORECASE)
-            if m_dur: 
-                st.session_state["val_durata"] = int(m_dur.group(1))
+            if m_dur: st.session_state["val_durata"] = int(m_dur.group(1))
 
             # 2. KM TOTALI O ANNUI
             m_km = re.search(r'(?:km totali|percorrenza|km totall)[\s\S]{0,30}?(\d{2,3}[\s\.]?\d{3})', testo_pulito, re.IGNORECASE)
@@ -101,26 +106,20 @@ if check_password():
             
             if m_km:
                 km_tot = int(re.sub(r'\D', '', m_km.group(1)))
-                if km_tot > 30000:
-                    mesi = st.session_state.get("val_durata", 36)
+                mesi = st.session_state.get("val_durata", 36)
+                if km_tot > 30000 and mesi > 0:
                     st.session_state["val_km"] = int((km_tot / mesi) * 12)
                 else:
                     st.session_state["val_km"] = km_tot
 
             # 3. CANONE
             m_canoni = re.findall(r'(\d{2,4}[.,]\d{2})', testo_pulito)
-            valid_canoni = []
-            for c in m_canoni:
-                val = float(c.replace('.', '').replace(',', '.'))
-                if 150 < val < 4000: valid_canoni.append(val)
+            valid_canoni = [float(c.replace('.', '').replace(',', '.')) for c in m_canoni if 150 < float(c.replace('.', '').replace(',', '.')) < 4000]
             if valid_canoni:
                 st.session_state["val_canone"] = max(valid_canoni)
 
-            # 4. CLIENTI, VEICOLI E PENALI
+            # 4. CLIENTI E VEICOLI
             testo_upper = testo_pulito.upper()
-            
-            # Innesco la modalità TESTO LIBERO (così non usiamo il listino), ma non tocco "Nuovo/Usato"
-            st.session_state["val_input_mode"] = "Testo Libero"
             
             if "ARVAL" in testo_upper:
                 m_cli = re.search(r'Ragione Sociale[\s\S]{0,10}?([A-Z\s]{5,})', testo_pulito)
@@ -128,7 +127,7 @@ if check_password():
                 m_vei = re.search(r'proposta di noleggio per il veicolo\s*([^\n]+)', testo_pulito, re.IGNORECASE)
                 if m_vei: 
                     vei_str = m_vei.group(1).strip()
-                    st.session_state["val_marca_stampa"] = vei_str.split()[0]
+                    if vei_str.split(): st.session_state["val_marca_stampa"] = vei_str.split()[0]
                     st.session_state["val_versione_stampa"] = vei_str
                     
             elif "LEASYS" in testo_upper:
@@ -145,22 +144,25 @@ if check_password():
                 m_vei = re.search(r'Veicolo\s*:\s*([^\n]+\n?[^\n]+)', testo_pulito, re.IGNORECASE)
                 if m_vei:
                     vei_str = m_vei.group(1).replace('\n', ' ').strip()
-                    st.session_state["val_marca_stampa"] = vei_str.split()[0]
+                    if vei_str.split(): st.session_state["val_marca_stampa"] = vei_str.split()[0]
                     st.session_state["val_versione_stampa"] = vei_str
 
-            # CHECK PENALI BASE
+            # 5. PENALI BASE
             if "500" in testo_pulito and ("Danni" in testo_pulito or "Kasko" in testo_pulito): st.session_state["val_p_kasko"] = "500 Euro"
             elif "1000" in testo_pulito: st.session_state["val_p_kasko"] = "1000 Euro"
+            
             if "250" in testo_pulito and "RCA" in testo_pulito: st.session_state["val_p_rca"] = "250 Euro"
             elif "500" in testo_pulito and "RCA" in testo_pulito: st.session_state["val_p_rca"] = "500 Euro"
+            
             if "10%" in testo_pulito: st.session_state["val_p_if"] = "10%"
             elif "5%" in testo_pulito: st.session_state["val_p_if"] = "5%"
 
-            st.sidebar.success("✅ Dati importati in modalità Testo Libero!")
+            st.sidebar.success("✅ Dati importati correttamente!")
             st.rerun()
             
         except Exception as e:
-            st.sidebar.error("Errore nella lettura del PDF. Riprova.")
+            # FIX: Mostra l'errore tecnico esatto per capire cosa fallisce
+            st.sidebar.error(f"Errore tecnico durante la lettura: {str(e)}")
 
     st.sidebar.markdown("---")
     st.sidebar.header("📁 Database Listino")
@@ -188,15 +190,11 @@ if check_password():
         st.subheader("👤 Cliente")
         nome_cliente = st.text_input("Nome Cliente", value=st.session_state.get("val_cliente", ""))
         consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
-        
-        # Stato Veicolo serve SOLO per la stampa
         t_veicolo = st.radio("Stato Veicolo (Stampa)", ["Nuovo", "Usato"], horizontal=True)
         note_p = st.text_area("Note e optional", height=70)
     
     with c2:
         st.subheader("🚘 Veicolo")
-        
-        # NUOVO TOGGLE: Scegli se usare il listino o scrivere a mano
         idx_input_mode = 1 if st.session_state.get("val_input_mode") == "Testo Libero" else 0
         input_mode = st.radio("Modalità Inserimento", ["Da Listino", "Testo Libero"], horizontal=True, index=idx_input_mode)
         
