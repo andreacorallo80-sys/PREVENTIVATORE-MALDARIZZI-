@@ -204,7 +204,7 @@ if check_password():
             st.sidebar.success("✅ Dati estratti chirurgicamente!")
             st.rerun()
             
-       except Exception as e:
+    except Exception as e:
             # Abbiamo cambiato 'testo_pulito' in 'testo_flat'
             st.session_state["debug_text"] = testo_flat if 'testo_flat' in locals() else f"Errore: {str(e)}"
             st.sidebar.error(f"Errore durante l'analisi del PDF: {str(e)}")
@@ -416,4 +416,5 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
