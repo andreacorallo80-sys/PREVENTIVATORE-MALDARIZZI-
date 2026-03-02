@@ -47,8 +47,12 @@ if check_password():
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Pro", layout="wide")
     
-    # Sidebar: Gestione Dati e Consulente
-    st.sidebar.header("📁 Gestione Database")
+    # Sidebar: Gestione Dati, Consulente e Validità
+    st.sidebar.header("⚙️ Impostazioni Offerta")
+    giorni_validita = st.sidebar.slider("Giorni di Validità", 1, 30, 7)
+    
+    st.sidebar.markdown("---")
+    st.sidebar.header("📁 Database")
     uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
     if uploaded_excel:
         with open("dati.xlsx", "wb") as f: f.write(uploaded_excel.getbuffer())
@@ -85,6 +89,7 @@ if check_password():
         foto_manuale = st.file_uploader("Foto Personalizzata", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
+    st.subheader("🛡️ Servizi e Penali")
     s1, s2, s3 = st.columns(3)
     with s1:
         p_rca = st.selectbox("Penale RCA", ["0 Euro", "250 Euro", "500 Euro"])
@@ -93,8 +98,10 @@ if check_password():
         p_kasko = st.selectbox("Penale Danni/Kasko", ["0 Euro", "250 Euro", "500 Euro", "1000 Euro"])
         infort = st.checkbox("Infortunio Conducente", value=True)
     with s3:
-        g_tipo = st.radio("Pneumatici", ["ILLIMITATI", "A NUMERO"], horizontal=True)
-        g_num = st.number_input("N. Gomme", 4) if g_tipo == "A NUMERO" else "ILLIMITATI"
+        usa_gomme = st.checkbox("Includere Servizio Pneumatici?", value=True)
+        if usa_gomme:
+            g_tipo = st.radio("Tipo Pneumatici", ["ILLIMITATI", "A NUMERO"], horizontal=True)
+            g_num = st.number_input("N. Gomme", 4) if g_tipo == "A NUMERO" else "ILLIMITATI"
 
     st.markdown("---")
     n1, n2, n3, n4 = st.columns(4)
@@ -109,8 +116,8 @@ if check_password():
         pdf.add_page()
         pdf.set_text_color(255, 255, 255)
         
-        # Intestazione Data e Benvenuto
-        data_f = f"{datetime.now().strftime('%d %B %Y')} Validita 7 giorni"
+        # Intestazione Data e Validità Editabile
+        data_f = f"{datetime.now().strftime('%d %B %Y')} Validita {giorni_validita} giorni"
         pdf.set_font("Arial", "", 10)
         pdf.set_xy(10, 42)
         pdf.cell(0, 10, data_f, ln=True)
@@ -120,7 +127,7 @@ if check_password():
         pdf.set_font("Arial", "I", 9)
         pdf.multi_cell(0, 4, "di seguito trova il preventivo che meglio si adatta alle sue esigenze.")
 
-        # Foto (ridimensionata per far stare tutto in una pagina)
+        # Foto
         foto_path = None
         if foto_manuale:
             with open("tmp.png", "wb") as f: f.write(foto_manuale.getbuffer())
@@ -131,7 +138,7 @@ if check_password():
                 if os.path.exists(p): foto_path = p; break
         
         if foto_path:
-            pdf.image(foto_path, 10, 65, 100) # Ridotta larghezza
+            pdf.image(foto_path, 10, 65, 100)
             pdf.set_y(135)
         else:
             pdf.ln(10)
@@ -158,11 +165,13 @@ if check_password():
             f"- RCA: franchigia {p_rca}",
             f"- Incendio/Furto: franchigia {p_if}",
             f"- Danni: franchigia {p_kasko}",
-            f"- Gomme: {g_num}",
             "- Manutenzione Ord/Straord",
             "- Assistenza Stradale H24"
         ]
         if infort: serv_list.append("- Infortunio Conducente")
+        if usa_gomme:
+            txt_g = f"- Gomme: {g_num}" if g_tipo == "A NUMERO" else "- Gomme: ILLIMITATE"
+            serv_list.insert(3, txt_g) # Lo inserisce in quarta posizione
         
         y_serv = pdf.get_y()
         for i, s in enumerate(serv_list):
@@ -173,14 +182,14 @@ if check_password():
                 pdf.set_x(110)
                 pdf.cell(90, 5, s, ln=True)
 
-        # Prezzo (Fascia finale)
+        # Prezzo
         pdf.set_y(225)
         pdf.set_font("Arial", "B", 26)
         pdf.cell(0, 12, f"Euro {canone}/mese (iva esclusa)", ln=True, align="L")
         pdf.set_font("Arial", "B", 16)
         pdf.cell(0, 10, f"Anticipo: Euro {anticipo}", ln=True, align="L")
 
-        # Note e Disclaimer (In fondo)
+        # Note e Disclaimer
         if note:
             pdf.set_font("Arial", "I", 8)
             pdf.set_text_color(180, 180, 180)
@@ -205,11 +214,9 @@ if check_password():
 
         pdf.output("preventivo.pdf")
         
-        st.markdown("""
-            <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
-                <style>@keyframes fall { 0% { transform: translateY(-10vh); } 100% { transform: translateY(110vh); } } .car { position: absolute; font-size: 35px; animation: fall 1.5s linear forwards; }</style>
-                <div class="car" style="left: 20%;">🚗</div><div class="car" style="left: 40%;">🚙</div><div class="car" style="left: 60%;">🚗</div><div class="car" style="left: 80%;">🚙</div>
-            </div>""", unsafe_allow_html=True)
-
+        st.success("Preventivo Generato!")
         with open("preventivo.pdf", "rb") as f:
             st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{modello}.pdf")
+        with open("preventivo.pdf", "rb") as f:
+            st.download_button("📩 SCARICA IL PREVENTIVO", f, f"Offerta_{modello}.pdf")
+
