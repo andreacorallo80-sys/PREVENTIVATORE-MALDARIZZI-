@@ -58,7 +58,7 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
-    # --- 2. CLASSE PDF (LAYOUT UFFICIALE MALDARIZZI) ---
+  # --- 2. CLASSE PDF (LAYOUT CON SFONDO SCURO) ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -71,32 +71,31 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # 1. Sfondo (Tema Bianco)
-            self.set_fill_color(255, 255, 255)
-            self.rect(0, 0, 210, 297, 'F')
-            
-            # 2. Triangolo alto sx (Nero)
-            self.set_fill_color(20, 20, 20) 
-            self.polygon([(0, 0), (100, 0), (0, 45)], style="F")
-            
-            # 3. Triangolo basso dx (Nero)
-            self.set_fill_color(20, 20, 20) 
-            self.polygon([(210, 297), (100, 297), (210, 240)], style="F")
+            # 1. Carichiamo l'immagine di sfondo SCURA
+            if os.path.exists("sfondo_nero.jpg"):
+                try:
+                    self.image("sfondo_nero.jpg", 0, 0, 210, 297)
+                except Exception:
+                    # Sfondo di riserva scuro se l'immagine non si carica
+                    self.set_fill_color(20, 20, 20)
+                    self.rect(0, 0, 210, 297, 'F')
+            else:
+                self.set_fill_color(20, 20, 20)
+                self.rect(0, 0, 210, 297, 'F')
 
-            # 4. Logo in alto a sx (sul triangolo nero)
+            # 2. Logo in alto a sx
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 5, 5, 45) 
                 except Exception:
                     pass
 
-            # 5. Footer: Logo in basso a destra sul triangolo nero
+            # 3. Footer: Logo in basso a destra
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 145, 275, 55)
                 except Exception:
                     pass
-
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
@@ -361,7 +360,7 @@ if check_password():
                 st.rerun()
                 
         with col_stampa:
-            if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
+           if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -373,20 +372,20 @@ if check_password():
                 for p in st.session_state["lista_preventivi"]:
                     pdf.add_page()
                     
-                    # 0. NOME CLIENTE AL CENTRO
+                    # 0. NOME CLIENTE AL CENTRO (Testo Bianco)
                     pdf.set_y(20)
                     pdf.set_font(pdf.f_f, "", 12)
-                    pdf.set_text_color(100, 100, 100) # Grigio per l'etichetta
+                    pdf.set_text_color(200, 200, 200) # Grigio chiaro per l'etichetta
                     pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
                     
                     pdf.set_font(pdf.f_f, "B", 16)
-                    pdf.set_text_color(20, 20, 20) # Nero per il nome
+                    pdf.set_text_color(255, 255, 255) # BIANCO per il nome
                     pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
                     
-                    # 1. TITOLO AUTO
+                    # 1. TITOLO AUTO (Testo Bianco)
                     pdf.set_y(45)
                     pdf.set_font(pdf.f_f, "B", 24)
-                    pdf.set_text_color(20, 20, 20)
+                    pdf.set_text_color(255, 255, 255) # BIANCO
                     titolo_auto = pulisci_testo(f"{p['marca']} {p['versione']}")
                     pdf.multi_cell(0, 10, titolo_auto, align="C")
                     
@@ -407,14 +406,14 @@ if check_password():
                     # 3. PREZZO GIGANTE IN ORO MALDARIZZI
                     pdf.set_y(160) 
                     pdf.set_font(pdf.f_f, "B", 40)
-                    pdf.set_text_color(201, 188, 65)
+                    pdf.set_text_color(201, 188, 65) # ORO
                     pdf.cell(0, 15, pulisci_testo(f"Euro {p['canone']} / mese"), align="C", ln=True)
                     
-                    # 4. BOTTONI DATI
+                    # 4. BOTTONI DATI (Sfondo grigio scuro, Testo Bianco)
                     pdf.set_y(180)
                     pdf.set_font(pdf.f_f, "B", 11)
                     pdf.set_text_color(255, 255, 255)
-                    pdf.set_fill_color(20, 20, 20)
+                    pdf.set_fill_color(40, 40, 40) # Grigio scuro per staccare dal nero
                     
                     km_tot = int(p['km']) * int(p['durata']) // 12
                     voci = [
@@ -433,10 +432,10 @@ if check_password():
                         pdf.set_xy(x_pos, 180)
                         pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                     
-                    # 5. SERVIZI INCLUSI 
+                    # 5. SERVIZI INCLUSI (Testo Bianco)
                     pdf.set_y(202)
                     pdf.set_font(pdf.f_f, "B", 11)
-                    pdf.set_text_color(20, 20, 20)
+                    pdf.set_text_color(255, 255, 255) # BIANCO
                     pdf.set_x(10)
                     pdf.cell(0, 6, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
                     
@@ -455,10 +454,10 @@ if check_password():
                     pdf.set_x(10)
                     pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
-                    # 6. DISCLAIMER E NOTE LEGALI
+                    # 6. DISCLAIMER E NOTE LEGALI (Grigio chiaro)
                     pdf.ln(3)
                     pdf.set_font(pdf.f_f, "I", 8)
-                    pdf.set_text_color(100, 100, 100) 
+                    pdf.set_text_color(180, 180, 180) 
                     
                     pdf.set_x(10) 
                     pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C")
@@ -470,19 +469,19 @@ if check_password():
                     if p['note']:
                         pdf.ln(2)
                         pdf.set_font(pdf.f_f, "B", 9)
-                        pdf.set_text_color(20, 20, 20)
+                        pdf.set_text_color(255, 255, 255) # BIANCO
                         pdf.set_x(10)
                         pdf.multi_cell(0, 5, pulisci_testo(f"Note aggiuntive: {p['note']}"), align="C")
 
-                    # 8. RIFERIMENTI VENDITORE
+                    # 8. RIFERIMENTI VENDITORE (Testo Bianco)
                     pdf.set_y(255)
                     pdf.set_font(pdf.f_f, "B", 10)
-                    pdf.set_text_color(20, 20, 20)
+                    pdf.set_text_color(255, 255, 255) # BIANCO
                     pdf.set_x(10)
                     pdf.cell(0, 5, pulisci_testo(f"CONSULENTE: {nome_cons.upper()}"), align="C", ln=True)
                     
                     pdf.set_font(pdf.f_f, "", 9)
-                    pdf.set_text_color(60, 60, 60)
+                    pdf.set_text_color(200, 200, 200) # Grigio chiaro
                     pdf.set_x(10)
                     pdf.cell(0, 5, pulisci_testo(f"E-mail: {email_cons}  |  Tel: {tel_cons}"), align="C", ln=True)
 
