@@ -58,18 +58,27 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
-  def header(self):
+    # --- 2. CLASSE PDF (LAYOUT UFFICIALE MALDARIZZI) ---
+    class MaldarizziPDF(FPDF):
+        def __init__(self):
+            super().__init__()
+            self.set_margins(10, 10, 10)
+            self.set_auto_page_break(False)
+            if os.path.exists("Rubik-Light.ttf"):
+                self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
+            if os.path.exists("Rubik-Bold.ttf"):
+                self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
+            self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
+
+        def header(self):
             # 1. Carichiamo l'immagine di sfondo premium che copre tutto il foglio
             if os.path.exists("sfondo_premium.jpg"):
                 try:
-                    # L'immagine viene posizionata nell'angolo 0,0 e allargata fino a coprire 210x297 (formato A4)
                     self.image("sfondo_premium.jpg", 0, 0, 210, 297)
                 except Exception:
-                    # Se per qualche motivo il file non si carica, usa uno sfondo bianco di riserva
                     self.set_fill_color(255, 255, 255)
                     self.rect(0, 0, 210, 297, 'F')
             else:
-                # Se il file non esiste, usa uno sfondo bianco di riserva
                 self.set_fill_color(255, 255, 255)
                 self.rect(0, 0, 210, 297, 'F')
 
@@ -87,7 +96,7 @@ if check_password():
                 except Exception:
                     pass
 
-    # --- 3. INTERFACCIA STREAMLIT ---
+    # --- 3. INTERFACCIA STREAMLIT (Tutto questo blocco è allineato a 1 livello di indentazione) ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
     except: pass
