@@ -70,23 +70,55 @@ if check_password():
                 self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
+        # --- 2. CLASSE PDF (LAYOUT MALDARIZZI: ORO, NERO E BIANCO) ---
+    class MaldarizziPDF(FPDF):
+        def __init__(self):
+            super().__init__()
+            self.set_margins(10, 10, 10)
+            self.set_auto_page_break(False)
+            if os.path.exists("Rubik-Light.ttf"):
+                self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
+            if os.path.exists("Rubik-Bold.ttf"):
+                self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
+            self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
+
         def header(self):
-            if os.path.exists("slider-maldarizzirent.jpg"):
-                self.image("slider-maldarizzirent.jpg", 0, 0, 210, 297)
-            else:
-                self.set_fill_color(30, 30, 30)
-                self.rect(0, 0, 210, 297, 'F')
-
-            self.set_fill_color(0, 0, 0)
-            self.rect(0, 0, 210, 40, 'F')
-            if os.path.exists("logo.png"):
-                self.image("logo.png", 75, 8, 60)
+            # 1. Sfondo (Tema Bianco)
+            self.set_fill_color(255, 255, 255)
+            self.rect(0, 0, 210, 297, 'F')
             
-            self.set_y(45)
-            self.set_font(self.f_f, "B", 20)
-            self.set_text_color(255, 255, 255)
-            self.cell(0, 10, "IL TUO PREVENTIVO", align="C", ln=True)
+            # 2. Triangolo alto sx (Oro Maldarizzi #c9bc41)
+            self.set_fill_color(201, 188, 65) 
+            self.polygon([(0, 0), (100, 0), (0, 45)], style="F")
+            
+            # 3. Triangolo basso dx (Tema Nero)
+            self.set_fill_color(20, 20, 20) 
+            self.polygon([(210, 297), (100, 297), (210, 240)], style="F")
 
+            # 4. Intestazione in alto
+            self.set_y(15)
+            if os.path.exists("logo_abbonamenti.png"):
+                try:
+                    self.image("logo_abbonamenti.png", 65, 5, 80)
+                except Exception:
+                    pass
+            else:
+                self.set_font(self.f_f, "B", 24)
+                self.set_text_color(20, 20, 20) # Testo nero
+                self.cell(0, 10, "MALDARIZZI RENT", align="C", ln=True)
+
+            # 5. Footer: Logo in basso a destra sul triangolo nero
+            self.set_y(280)
+            self.set_x(100)
+            self.set_font(self.f_f, "B", 14)
+            self.set_text_color(255, 255, 255) # Testo bianco
+            self.cell(40, 10, "Powered by", align="R")
+            
+            if os.path.exists("logo.png"):
+                try:
+                    self.image("logo.png", 145, 275, 55)
+                except Exception:
+                    pass
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
@@ -348,7 +380,7 @@ if check_password():
                 st.rerun()
                 
         with col_stampa:
-            if st.button("🚀 STAMPA PREVENTIVO UNICO (PDF MULTIPLO)"):
+            if st.button("🚀 STAMPA PREVENTIVO UNICO (NUOVO DESIGN)"):
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -356,19 +388,19 @@ if check_password():
                     </div>""", unsafe_allow_html=True)
 
                 pdf = MaldarizziPDF()
-                data_it = datetime.now().strftime('%d %B %Y').upper()
                 
                 for p in st.session_state["lista_preventivi"]:
                     pdf.add_page()
-                    pdf.set_text_color(255, 255, 255)
                     
-                    pdf.set_y(58)
-                    pdf.set_font(pdf.f_f, "", 9)
-                    pdf.cell(0, 5, pulisci_testo(f"{data_it} - VALIDITÀ {g_validita} GIORNI"), align="C", ln=True)
-                    pdf.set_font(pdf.f_f, "B", 12)
-                    pdf.cell(0, 8, pulisci_testo(f"SPETT.LE {p['cliente'].upper()}"), align="C", ln=True)
-
-                    y_pos = 85
+                    # 1. TITOLO AUTO
+                    pdf.set_y(45)
+                    pdf.set_font(pdf.f_f, "B", 24)
+                    pdf.set_text_color(20, 20, 20) # Tema Nero
+                    titolo_auto = pulisci_testo(f"{p['marca']} {p['versione']}")
+                    pdf.multi_cell(0, 10, titolo_auto, align="C")
+                    
+                    # 2. IMMAGINE AUTO
+                    y_img = pdf.get_y() + 5
                     f_path = "tmp_multi.png"
                     if p["foto_bytes"]:
                         with open(f_path, "wb") as f: f.write(p["foto_bytes"])
@@ -376,72 +408,62 @@ if check_password():
                         f_path = f"foto_vetture/{p['marca'].upper()}.jpg"
                     
                     if os.path.exists(f_path):
-                        pdf.image(f_path, 110, y_pos, 90)
+                        try:
+                            pdf.image(f_path, 25, y_img, 160)
+                        except Exception:
+                            pass
                     
-                    pdf.set_xy(15, y_pos)
-                    pdf.set_font(pdf.f_f, "B", 20)
-                    pdf.multi_cell(90, 8, p['marca'].upper())
-                    pdf.set_x(15)
-                    pdf.set_font(pdf.f_f, "", 11)
-                    pdf.multi_cell(90, 5, p['versione'])
+                    # 3. PREZZO GIGANTE IN ORO MALDARIZZI
+                    pdf.set_y(175)
+                    pdf.set_font(pdf.f_f, "B", 40)
+                    pdf.set_text_color(201, 188, 65) # Colore #c9bc41
+                    pdf.cell(0, 15, pulisci_testo(f"Euro {p['canone']} / mese"), align="C", ln=True)
                     
-                    pdf.ln(4)
-                    pdf.set_font(pdf.f_f, "B", 10)
-                    pdf.set_x(15)
-                    pdf.cell(90, 6, pulisci_testo(f"STATO: {p['t_veicolo'].upper()} ({p['consegna']})"), ln=True)
-                    pdf.set_x(15)
-                    pdf.cell(90, 6, pulisci_testo(f"DURATA CONTRATTO: {p['durata']} MESI"), ln=True)
-                    pdf.set_x(15)
-                    pdf.cell(90, 6, pulisci_testo(f"KM/ANNO: {p['km']:,} KM".replace(",", ".")), ln=True)
-
-                    pdf.set_y(155)
+                    # 4. BOTTONI DATI: Sfondo Nero, Testo Bianco
+                    pdf.set_y(205)
                     pdf.set_font(pdf.f_f, "B", 11)
-                    pdf.cell(0, 7, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
-                    pdf.set_font(pdf.f_f, "", 9)
+                    pdf.set_text_color(255, 255, 255) # Testo Bianco
+                    pdf.set_fill_color(20, 20, 20) # Sfondo Nero
                     
-                    serv_list = [
-                        f"RCA (Franchigia {p['p_rca']})", 
-                        f"Incendio/Furto (Franchigia {p['p_if']})",
-                        f"Danni/Kasko (Franchigia {p['p_kasko']})",
-                        "Manutenzione Ordinaria/Straordinaria",
-                        "Assistenza Stradale H24"
+                    km_tot = int(p['km']) * int(p['durata']) // 12
+                    
+                    voci = [
+                        f"Km {km_tot}", 
+                        f"{p['durata']} mesi", 
+                        f"Anticipo {p['anticipo']}", 
+                        "Iva esclusa"
                     ]
-                    if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
-                    if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
                     
-                    pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
+                    larghezza_box = 42
+                    spazio = 4
+                    start_x = (210 - (larghezza_box * 4 + spazio * 3)) / 2
                     
-                    pdf.ln(2)
-                    pdf.set_font(pdf.f_f, "I", 8)
-                    pdf.set_text_color(220, 220, 220)
-                    pdf.cell(0, 5, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C", ln=True)
-
-                    pdf.set_y(210)
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.set_font(pdf.f_f, "B", 28)
-                    pdf.cell(0, 15, pulisci_testo(f"EURO {p['canone']}/MESE"), align="C", ln=True)
-                    pdf.set_font(pdf.f_f, "B", 14)
-                    pdf.cell(0, 8, pulisci_testo(f"Anticipo: Euro {p['anticipo']} (Iva Esclusa)"), align="C", ln=True)
+                    for i, voce in enumerate(voci):
+                        x_pos = start_x + (larghezza_box + spazio) * i
+                        pdf.set_xy(x_pos, 205)
+                        pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
+                    
+                    # 5. SERVIZI INCLUSI (Testo Nero)
+                    pdf.set_y(225)
+                    pdf.set_font(pdf.f_f, "B", 10)
+                    pdf.set_text_color(20, 20, 20)
+                    
+                    serv_text1 = f"CAMBIO PNEUMATICI: {'INCLUSO' if p['g_num'] else 'NO'}"
+                    serv_text2 = f"ASSICURAZIONE FURTO: FRANCHIGIA {p['p_if'].upper()}"
+                    
+                    pdf.set_x(25)
+                    pdf.cell(80, 8, pulisci_testo(serv_text1), align="L")
+                    pdf.set_x(105)
+                    pdf.cell(80, 8, pulisci_testo(serv_text2), align="R", ln=True)
 
                     if p['note']:
-                        pdf.ln(2)
+                        pdf.ln(5)
                         pdf.set_font(pdf.f_f, "I", 9)
+                        pdf.set_text_color(100, 100, 100)
                         pdf.multi_cell(0, 5, pulisci_testo(f"Note: {p['note']}"), align="C")
-
-                    pdf.set_fill_color(0, 0, 0)
-                    pdf.rect(0, 260, 210, 37, 'F')
-                    pdf.set_y(265)
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.set_font(pdf.f_f, "B", 10)
-                    pdf.cell(0, 6, pulisci_testo(f"CONSULENTE: {nome_cons.upper()}"), align="C", ln=True)
-                    pdf.set_font(pdf.f_f, "", 9)
-                    pdf.cell(0, 5, pulisci_testo(f"E-mail: {email_cons} | Tel: {tel_cons}"), align="C", ln=True)
-                    pdf.set_font(pdf.f_f, "I", 7)
-                    pdf.cell(0, 8, pulisci_testo("MALDARIZZI RENT - HTTPS://NOLEGGIO.MALDARIZZI.COM/"), align="C", ln=True)
 
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
-                    st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
+                    st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
 
 
