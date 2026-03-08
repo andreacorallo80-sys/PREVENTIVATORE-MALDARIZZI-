@@ -71,32 +71,33 @@ if check_password():
             self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
         def header(self):
-            # 1. Carichiamo l'immagine di sfondo premium che copre tutto il foglio
-            if os.path.exists("sfondo_premium.jpg"):
-                try:
-                    self.image("sfondo_premium.jpg", 0, 0, 210, 297)
-                except Exception:
-                    self.set_fill_color(255, 255, 255)
-                    self.rect(0, 0, 210, 297, 'F')
-            else:
-                self.set_fill_color(255, 255, 255)
-                self.rect(0, 0, 210, 297, 'F')
+            # 1. Sfondo (Tema Bianco)
+            self.set_fill_color(255, 255, 255)
+            self.rect(0, 0, 210, 297, 'F')
+            
+            # 2. Triangolo alto sx (Nero)
+            self.set_fill_color(20, 20, 20) 
+            self.polygon([(0, 0), (100, 0), (0, 45)], style="F")
+            
+            # 3. Triangolo basso dx (Nero)
+            self.set_fill_color(20, 20, 20) 
+            self.polygon([(210, 297), (100, 297), (210, 240)], style="F")
 
-            # 4. Logo in alto a sx (ora si integrerà con la grafica dello sfondo)
+            # 4. Logo in alto a sx (sul triangolo nero)
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 5, 5, 45) 
                 except Exception:
                     pass
 
-            # 5. Footer: Logo in basso a destra sul triangolo dello sfondo
+            # 5. Footer: Logo in basso a destra sul triangolo nero
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 145, 275, 55)
                 except Exception:
                     pass
 
-    # --- 3. INTERFACCIA STREAMLIT (Tutto questo blocco è allineato a 1 livello di indentazione) ---
+    # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
     except: pass
@@ -488,4 +489,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
