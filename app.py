@@ -144,6 +144,13 @@ if check_password():
                                 prezzo_corretto = v
                                 break
                         st.session_state["val_canone"] = prezzo_corretto
+                        
+                        # --- ESTRAZIONE ANTICIPO AYVENS (Mirata) ---
+                # Cerchiamo esattamente la frase "Anticipo (iva esclusa) €" e catturiamo il numero
+                m_ant = re.search(r'Anticipo\s*\(iva\s*esclusa\)\s*€\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                if m_ant:
+                    # Trasformiamo la virgola in punto per Python e salviamo in memoria
+                    st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
 
             elif "LEASYS" in testo_upper:
                 # ESTRAZIONE LEASYS (Intatta e protetta)
@@ -435,3 +442,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
