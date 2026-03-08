@@ -294,7 +294,7 @@ if check_password():
         rca_idx = rca_options.index(st.session_state.get("val_p_rca", "250 Euro")) if st.session_state.get("val_p_rca", "250 Euro") in rca_options else 1
         p_rca = st.selectbox("Penale RCA", rca_options, index=rca_idx)
         
-        if_options = ["0%", "5%", "500 Euro", "10%", "20%","250 Euro"]
+        if_options = ["0 Euro", "5%", "500 Euro", "10%", "20%","250 Euro"]
         if_idx = if_options.index(st.session_state.get("val_p_if", "10%")) if st.session_state.get("val_p_if", "10%") in if_options else 2
         p_if = st.selectbox("Penale Incendio/Furto", if_options, index=if_idx)
     
@@ -442,5 +442,6 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA IL PREVENTIVO CONGIUNTO", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
 
