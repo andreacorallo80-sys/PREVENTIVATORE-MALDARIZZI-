@@ -58,24 +58,13 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
-    # --- 2. CLASSE PDF (Versione Pulita per FPDF2) ---
+    # --- 2. CLASSE PDF (LAYOUT UFFICIALE MALDARIZZI) ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
             self.set_margins(10, 10, 10)
             self.set_auto_page_break(False)
-            if os.path.exists("Rubik-Light.ttf"):
-                self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
-            if os.path.exists("Rubik-Bold.ttf"):
-                self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
-            self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
-
-        # --- 2. CLASSE PDF (LAYOUT MALDARIZZI: ORO, NERO E BIANCO) ---
-    class MaldarizziPDF(FPDF):
-        def __init__(self):
-            super().__init__()
-            self.set_margins(10, 10, 10)
-            self.set_auto_page_break(False)
+            # Qui diciamo al sistema di usare il font Rubik in tutto il documento
             if os.path.exists("Rubik-Light.ttf"):
                 self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
             if os.path.exists("Rubik-Bold.ttf"):
@@ -95,25 +84,14 @@ if check_password():
             self.set_fill_color(20, 20, 20) 
             self.polygon([(210, 297), (100, 297), (210, 240)], style="F")
 
-            # 4. Intestazione in alto
-            self.set_y(15)
-            if os.path.exists("logo_abbonamenti.png"):
+            # 4. Intestazione: Logo al centro
+            if os.path.exists("logo.png"):
                 try:
-                    self.image("logo_abbonamenti.png", 65, 5, 80)
+                    self.image("logo.png", 75, 8, 60) # Posizionato centralmente
                 except Exception:
                     pass
-            else:
-                self.set_font(self.f_f, "B", 24)
-                self.set_text_color(20, 20, 20) # Testo nero
-                self.cell(0, 10, "MALDARIZZI RENT", align="C", ln=True)
 
-            # 5. Footer: Logo in basso a destra sul triangolo nero
-            self.set_y(280)
-            self.set_x(100)
-            self.set_font(self.f_f, "B", 14)
-            self.set_text_color(255, 255, 255) # Testo bianco
-            self.cell(40, 10, "Powered by", align="R")
-            
+            # 5. Footer: Solo Logo in basso a destra sul triangolo nero
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 145, 275, 55)
@@ -380,7 +358,7 @@ if check_password():
                 st.rerun()
                 
         with col_stampa:
-            if st.button("🚀 STAMPA PREVENTIVO UNICO (NUOVO DESIGN)"):
+           if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -395,12 +373,12 @@ if check_password():
                     # 1. TITOLO AUTO
                     pdf.set_y(45)
                     pdf.set_font(pdf.f_f, "B", 24)
-                    pdf.set_text_color(20, 20, 20) # Tema Nero
+                    pdf.set_text_color(20, 20, 20)
                     titolo_auto = pulisci_testo(f"{p['marca']} {p['versione']}")
                     pdf.multi_cell(0, 10, titolo_auto, align="C")
                     
                     # 2. IMMAGINE AUTO
-                    y_img = pdf.get_y() + 5
+                    y_img = pdf.get_y() + 2
                     f_path = "tmp_multi.png"
                     if p["foto_bytes"]:
                         with open(f_path, "wb") as f: f.write(p["foto_bytes"])
@@ -414,19 +392,18 @@ if check_password():
                             pass
                     
                     # 3. PREZZO GIGANTE IN ORO MALDARIZZI
-                    pdf.set_y(175)
+                    pdf.set_y(160) # Alzato un po' per fare spazio ai testi
                     pdf.set_font(pdf.f_f, "B", 40)
-                    pdf.set_text_color(201, 188, 65) # Colore #c9bc41
+                    pdf.set_text_color(201, 188, 65)
                     pdf.cell(0, 15, pulisci_testo(f"Euro {p['canone']} / mese"), align="C", ln=True)
                     
-                    # 4. BOTTONI DATI: Sfondo Nero, Testo Bianco
-                    pdf.set_y(205)
+                    # 4. BOTTONI DATI
+                    pdf.set_y(180)
                     pdf.set_font(pdf.f_f, "B", 11)
-                    pdf.set_text_color(255, 255, 255) # Testo Bianco
-                    pdf.set_fill_color(20, 20, 20) # Sfondo Nero
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.set_fill_color(20, 20, 20)
                     
                     km_tot = int(p['km']) * int(p['durata']) // 12
-                    
                     voci = [
                         f"Km {km_tot}", 
                         f"{p['durata']} mesi", 
@@ -440,30 +417,44 @@ if check_password():
                     
                     for i, voce in enumerate(voci):
                         x_pos = start_x + (larghezza_box + spazio) * i
-                        pdf.set_xy(x_pos, 205)
+                        pdf.set_xy(x_pos, 180)
                         pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                     
-                    # 5. SERVIZI INCLUSI (Testo Nero)
-                    pdf.set_y(225)
-                    pdf.set_font(pdf.f_f, "B", 10)
+                    # 5. SERVIZI INCLUSI (Dinamici in base alle opzioni scelte!)
+                    pdf.set_y(205)
+                    pdf.set_font(pdf.f_f, "B", 11)
                     pdf.set_text_color(20, 20, 20)
+                    pdf.cell(0, 6, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
                     
-                    serv_text1 = f"CAMBIO PNEUMATICI: {'INCLUSO' if p['g_num'] else 'NO'}"
-                    serv_text2 = f"ASSICURAZIONE FURTO: FRANCHIGIA {p['p_if'].upper()}"
+                    pdf.set_font(pdf.f_f, "", 9)
+                    serv_list = [
+                        f"RCA (Franchigia {p['p_rca']})", 
+                        f"Incendio/Furto (Franchigia {p['p_if']})",
+                        f"Danni/Kasko (Franchigia {p['p_kasko']})",
+                        "Manutenzione Ordinaria/Straordinaria",
+                        "Assistenza Stradale H24"
+                    ]
+                    if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
+                    if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
                     
-                    pdf.set_x(25)
-                    pdf.cell(80, 8, pulisci_testo(serv_text1), align="L")
-                    pdf.set_x(105)
-                    pdf.cell(80, 8, pulisci_testo(serv_text2), align="R", ln=True)
+                    # Unisce tutti i servizi con il divisore " | "
+                    testo_servizi = " | ".join(serv_list)
+                    pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
+                    # 6. DISCLAIMER E NOTE LEGALI
+                    pdf.ln(4)
+                    pdf.set_font(pdf.f_f, "I", 8)
+                    pdf.set_text_color(100, 100, 100) # Grigio scuro
+                    pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C")
+                    pdf.multi_cell(0, 4, pulisci_testo("*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019)."), align="C")
+
+                    # 7. EVENTUALI NOTE PERSONALIZZATE DEL CONSULENTE
                     if p['note']:
-                        pdf.ln(5)
-                        pdf.set_font(pdf.f_f, "I", 9)
-                        pdf.set_text_color(100, 100, 100)
-                        pdf.multi_cell(0, 5, pulisci_testo(f"Note: {p['note']}"), align="C")
+                        pdf.ln(3)
+                        pdf.set_font(pdf.f_f, "B", 9)
+                        pdf.set_text_color(20, 20, 20)
+                        pdf.multi_cell(0, 5, pulisci_testo(f"Note aggiuntive: {p['note']}"), align="C")
 
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
