@@ -64,7 +64,6 @@ if check_password():
             super().__init__()
             self.set_margins(10, 10, 10)
             self.set_auto_page_break(False)
-            # Qui diciamo al sistema di usare il font Rubik in tutto il documento
             if os.path.exists("Rubik-Light.ttf"):
                 self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
             if os.path.exists("Rubik-Bold.ttf"):
@@ -76,22 +75,22 @@ if check_password():
             self.set_fill_color(255, 255, 255)
             self.rect(0, 0, 210, 297, 'F')
             
-            # 2. Triangolo alto sx (Oro Maldarizzi #c9bc41)
-            self.set_fill_color(201, 188, 65) 
+            # 2. Triangolo alto sx (Nero)
+            self.set_fill_color(20, 20, 20) 
             self.polygon([(0, 0), (100, 0), (0, 45)], style="F")
             
-            # 3. Triangolo basso dx (Tema Nero)
+            # 3. Triangolo basso dx (Nero)
             self.set_fill_color(20, 20, 20) 
             self.polygon([(210, 297), (100, 297), (210, 240)], style="F")
 
-            # 4. Intestazione: Logo al centro
+            # 4. Logo in alto a sx (sul triangolo nero)
             if os.path.exists("logo.png"):
                 try:
-                    self.image("logo.png", 75, 8, 60) # Posizionato centralmente
+                    self.image("logo.png", 5, 5, 45) 
                 except Exception:
                     pass
 
-            # 5. Footer: Solo Logo in basso a destra sul triangolo nero
+            # 5. Footer: Logo in basso a destra sul triangolo nero
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 145, 275, 55)
@@ -335,30 +334,7 @@ if check_password():
     with n4: km = st.number_input("Km/Anno", value=int(st.session_state["val_km"]))
 
     st.markdown("---")
-    if st.button("➕ AGGIUNGI AL DOCUMENTO"):
-        foto_bytes = foto_m.getvalue() if foto_m else None
-        auto_aggiunta = {
-            "cliente": pulisci_testo(nome_cliente), "consegna": pulisci_testo(consegna), 
-            "t_veicolo": pulisci_testo(t_veicolo), "note": pulisci_testo(note_p),
-            "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
-            "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
-            "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
-            "canone": canone, "anticipo": anticipo, "durata": durata, "km": km
-        }
-        st.session_state["lista_preventivi"].append(auto_aggiunta)
-        st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
-
-    if len(st.session_state["lista_preventivi"]) > 0:
-        st.info(f"🛒 Hai aggiunto **{len(st.session_state['lista_preventivi'])}** veicoli al preventivo congiunto.")
-        
-        col_stampa, col_svuota = st.columns([2, 1])
-        with col_svuota:
-            if st.button("🗑️ Svuota Lista"):
-                st.session_state["lista_preventivi"] = []
-                st.rerun()
-                
-        with col_stampa:
-           if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
+   if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -369,6 +345,16 @@ if check_password():
                 
                 for p in st.session_state["lista_preventivi"]:
                     pdf.add_page()
+                    
+                    # 0. NOME CLIENTE AL CENTRO
+                    pdf.set_y(20)
+                    pdf.set_font(pdf.f_f, "", 12)
+                    pdf.set_text_color(100, 100, 100) # Grigio per l'etichetta
+                    pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
+                    
+                    pdf.set_font(pdf.f_f, "B", 16)
+                    pdf.set_text_color(20, 20, 20) # Nero per il nome
+                    pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
                     
                     # 1. TITOLO AUTO
                     pdf.set_y(45)
@@ -392,7 +378,7 @@ if check_password():
                             pass
                     
                     # 3. PREZZO GIGANTE IN ORO MALDARIZZI
-                    pdf.set_y(160) # Alzato un po' per fare spazio ai testi
+                    pdf.set_y(160) 
                     pdf.set_font(pdf.f_f, "B", 40)
                     pdf.set_text_color(201, 188, 65)
                     pdf.cell(0, 15, pulisci_testo(f"Euro {p['canone']} / mese"), align="C", ln=True)
@@ -420,11 +406,11 @@ if check_password():
                         pdf.set_xy(x_pos, 180)
                         pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                     
-                   # 5. SERVIZI INCLUSI (Dinamici in base alle opzioni scelte!)
-                    pdf.set_y(205)
+                    # 5. SERVIZI INCLUSI 
+                    pdf.set_y(202)
                     pdf.set_font(pdf.f_f, "B", 11)
                     pdf.set_text_color(20, 20, 20)
-                    pdf.set_x(10) # Mettiamo il cursore a sinistra
+                    pdf.set_x(10)
                     pdf.cell(0, 6, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
                     
                     pdf.set_font(pdf.f_f, "", 9)
@@ -439,29 +425,42 @@ if check_password():
                     if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
                     
                     testo_servizi = " | ".join(serv_list)
-                    pdf.set_x(10) # Mettiamo il cursore a sinistra
+                    pdf.set_x(10)
                     pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
                     # 6. DISCLAIMER E NOTE LEGALI
-                    pdf.ln(4)
+                    pdf.ln(3)
                     pdf.set_font(pdf.f_f, "I", 8)
-                    pdf.set_text_color(100, 100, 100) # Grigio scuro
+                    pdf.set_text_color(100, 100, 100) 
                     
-                    pdf.set_x(10) # Mettiamo il cursore a sinistra
+                    pdf.set_x(10) 
                     pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C")
                     
-                    pdf.set_x(10) # ECCO LA SOLUZIONE: riportiamo il cursore a capo!
+                    pdf.set_x(10) 
                     pdf.multi_cell(0, 4, pulisci_testo("*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019)."), align="C")
 
                     # 7. EVENTUALI NOTE PERSONALIZZATE DEL CONSULENTE
                     if p['note']:
-                        pdf.ln(3)
+                        pdf.ln(2)
                         pdf.set_font(pdf.f_f, "B", 9)
                         pdf.set_text_color(20, 20, 20)
-                        pdf.set_x(10) # Mettiamo il cursore a sinistra
+                        pdf.set_x(10)
                         pdf.multi_cell(0, 5, pulisci_testo(f"Note aggiuntive: {p['note']}"), align="C")
+
+                    # 8. RIFERIMENTI VENDITORE
+                    pdf.set_y(255)
+                    pdf.set_font(pdf.f_f, "B", 10)
+                    pdf.set_text_color(20, 20, 20)
+                    pdf.set_x(10)
+                    pdf.cell(0, 5, pulisci_testo(f"CONSULENTE: {nome_cons.upper()}"), align="C", ln=True)
+                    
+                    pdf.set_font(pdf.f_f, "", 9)
+                    pdf.set_text_color(60, 60, 60)
+                    pdf.set_x(10)
+                    pdf.cell(0, 5, pulisci_testo(f"E-mail: {email_cons}  |  Tel: {tel_cons}"), align="C", ln=True)
 
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
