@@ -185,9 +185,12 @@ if check_password():
                 if m_can:
                     st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
                     
-                m_ant = re.search(r'Anticipo\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
+# --- ESTRAZIONE ANTICIPO LEASYS (Mirata per migliaia con spazio e IVA esclusa) ---
+                m_ant = re.search(r'Anticipo\s*€\s*([\d\s]+[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
-                    st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
+                    # Cattura il primo importo (es. "5 000,00"), toglie gli spazi vuoti e cambia la virgola in punto
+                    valore_pulito = m_ant.group(1).replace(' ', '').replace(',', '.')
+                    st.session_state["val_anticipo"] = float(valore_pulito)
                 
                 m_fran = re.search(r'Franchigia km\s+([\d\s]+)\b', testo_flat, re.IGNORECASE)
                 if m_fran:
@@ -488,3 +491,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
