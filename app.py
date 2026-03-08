@@ -96,6 +96,7 @@ if check_password():
                     self.image("logo.png", 145, 275, 55)
                 except Exception:
                     pass
+
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
@@ -107,9 +108,8 @@ if check_password():
     if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati"):
         try:
             pdf_bytes = io.BytesIO(pdf_portale.getvalue())
-            
-            # LETTURA DEL PDF CON PYPDF (Leasys è salvo qui!)
             reader = pypdf.PdfReader(pdf_bytes)
+            
             testo_estratto = ""
             for page in reader.pages:
                 t = page.extract_text()
@@ -153,16 +153,13 @@ if check_password():
                                 prezzo_corretto = v
                                 break
                         st.session_state["val_canone"] = prezzo_corretto
-                        
-                        # --- ESTRAZIONE ANTICIPO AYVENS (Mirata) ---
-                # Cerchiamo esattamente la frase "Anticipo (iva esclusa) €" e catturiamo il numero
+                
+                # ESTRAZIONE ANTICIPO AYVENS (Mirata)
                 m_ant = re.search(r'Anticipo\s*\(iva\s*esclusa\)\s*€\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
-                    # Trasformiamo la virgola in punto per Python e salviamo in memoria
                     st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
 
             elif "LEASYS" in testo_upper:
-                # ESTRAZIONE LEASYS (Intatta e protetta)
                 m_cli = re.search(r'VENDITA\s+(.*?)\s+MALDARIZZI', testo_flat, re.IGNORECASE)
                 if m_cli: 
                     st.session_state["val_cliente"] = m_cli.group(1).replace("SRL", "").replace("SPA", "").strip()
@@ -225,6 +222,11 @@ if check_password():
                         st.session_state["val_km"] = int((km_tot / durata) * 12)
                     else:
                         st.session_state["val_km"] = km_tot
+                
+                # ESTRAZIONE ANTICIPO ARVAL
+                m_ant = re.search(r'Anticipo\s*(?:€|Euro)?\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                if m_ant:
+                    st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
 
             # 5. PENALI BASE COMUNI
             if "500" in testo_flat and ("Danni" in testo_flat or "Kasko" in testo_flat): st.session_state["val_p_kasko"] = "500 Euro"
@@ -236,6 +238,8 @@ if check_password():
             
             if "10%" in testo_flat: st.session_state["val_p_if"] = "10%"
             elif "5%" in testo_flat: st.session_state["val_p_if"] = "5%"
+            elif "500" in testo_flat and ("Incendio" in testo_flat or "Furto" in testo_flat): st.session_state["val_p_if"] = "500 Euro"
+            elif "250" in testo_flat and ("Incendio" in testo_flat or "Furto" in testo_flat): st.session_state["val_p_if"] = "250 Euro"
 
             st.sidebar.success("✅ Dati estratti chirurgicamente!")
             st.rerun()
@@ -303,7 +307,7 @@ if check_password():
         rca_idx = rca_options.index(st.session_state.get("val_p_rca", "250 Euro")) if st.session_state.get("val_p_rca", "250 Euro") in rca_options else 1
         p_rca = st.selectbox("Penale RCA", rca_options, index=rca_idx)
         
-        if_options = ["0 Euro", "5%", "500 Euro", "10%", "20%","250 Euro"]
+        if_options = ["0%", "5%", "10%", "250 Euro", "500 Euro"]
         if_idx = if_options.index(st.session_state.get("val_p_if", "10%")) if st.session_state.get("val_p_if", "10%") in if_options else 2
         p_if = st.selectbox("Penale Incendio/Furto", if_options, index=if_idx)
     
@@ -334,7 +338,30 @@ if check_password():
     with n4: km = st.number_input("Km/Anno", value=int(st.session_state["val_km"]))
 
     st.markdown("---")
-   if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
+    if st.button("➕ AGGIUNGI AL DOCUMENTO"):
+        foto_bytes = foto_m.getvalue() if foto_m else None
+        auto_aggiunta = {
+            "cliente": pulisci_testo(nome_cliente), "consegna": pulisci_testo(consegna), 
+            "t_veicolo": pulisci_testo(t_veicolo), "note": pulisci_testo(note_p),
+            "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
+            "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
+            "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
+            "canone": canone, "anticipo": anticipo, "durata": durata, "km": km
+        }
+        st.session_state["lista_preventivi"].append(auto_aggiunta)
+        st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
+
+    if len(st.session_state["lista_preventivi"]) > 0:
+        st.info(f"🛒 Hai aggiunto **{len(st.session_state['lista_preventivi'])}** veicoli al preventivo congiunto.")
+        
+        col_stampa, col_svuota = st.columns([2, 1])
+        with col_svuota:
+            if st.button("🗑️ Svuota Lista"):
+                st.session_state["lista_preventivi"] = []
+                st.rerun()
+                
+        with col_stampa:
+            if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -462,5 +489,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
