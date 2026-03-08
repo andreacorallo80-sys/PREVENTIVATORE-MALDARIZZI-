@@ -58,39 +58,29 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
-    # --- 2. CLASSE PDF (LAYOUT UFFICIALE MALDARIZZI) ---
-    class MaldarizziPDF(FPDF):
-        def __init__(self):
-            super().__init__()
-            self.set_margins(10, 10, 10)
-            self.set_auto_page_break(False)
-            if os.path.exists("Rubik-Light.ttf"):
-                self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
-            if os.path.exists("Rubik-Bold.ttf"):
-                self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
-            self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
+  def header(self):
+            # 1. Carichiamo l'immagine di sfondo premium che copre tutto il foglio
+            if os.path.exists("sfondo_premium.jpg"):
+                try:
+                    # L'immagine viene posizionata nell'angolo 0,0 e allargata fino a coprire 210x297 (formato A4)
+                    self.image("sfondo_premium.jpg", 0, 0, 210, 297)
+                except Exception:
+                    # Se per qualche motivo il file non si carica, usa uno sfondo bianco di riserva
+                    self.set_fill_color(255, 255, 255)
+                    self.rect(0, 0, 210, 297, 'F')
+            else:
+                # Se il file non esiste, usa uno sfondo bianco di riserva
+                self.set_fill_color(255, 255, 255)
+                self.rect(0, 0, 210, 297, 'F')
 
-        def header(self):
-            # 1. Sfondo (Tema Bianco)
-            self.set_fill_color(255, 255, 255)
-            self.rect(0, 0, 210, 297, 'F')
-            
-            # 2. Triangolo alto sx (Nero)
-            self.set_fill_color(20, 20, 20) 
-            self.polygon([(0, 0), (100, 0), (0, 45)], style="F")
-            
-            # 3. Triangolo basso dx (Nero)
-            self.set_fill_color(20, 20, 20) 
-            self.polygon([(210, 297), (100, 297), (210, 240)], style="F")
-
-            # 4. Logo in alto a sx (sul triangolo nero)
+            # 4. Logo in alto a sx (ora si integrerà con la grafica dello sfondo)
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 5, 5, 45) 
                 except Exception:
                     pass
 
-            # 5. Footer: Logo in basso a destra sul triangolo nero
+            # 5. Footer: Logo in basso a destra sul triangolo dello sfondo
             if os.path.exists("logo.png"):
                 try:
                     self.image("logo.png", 145, 275, 55)
@@ -489,3 +479,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
