@@ -420,10 +420,11 @@ if check_password():
                         pdf.set_xy(x_pos, 180)
                         pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                     
-                    # 5. SERVIZI INCLUSI (Dinamici in base alle opzioni scelte!)
+                   # 5. SERVIZI INCLUSI (Dinamici in base alle opzioni scelte!)
                     pdf.set_y(205)
                     pdf.set_font(pdf.f_f, "B", 11)
                     pdf.set_text_color(20, 20, 20)
+                    pdf.set_x(10) # Mettiamo il cursore a sinistra
                     pdf.cell(0, 6, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
                     
                     pdf.set_font(pdf.f_f, "", 9)
@@ -437,15 +438,19 @@ if check_password():
                     if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
                     if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
                     
-                    # Unisce tutti i servizi con il divisore " | "
                     testo_servizi = " | ".join(serv_list)
+                    pdf.set_x(10) # Mettiamo il cursore a sinistra
                     pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
                     # 6. DISCLAIMER E NOTE LEGALI
                     pdf.ln(4)
                     pdf.set_font(pdf.f_f, "I", 8)
                     pdf.set_text_color(100, 100, 100) # Grigio scuro
+                    
+                    pdf.set_x(10) # Mettiamo il cursore a sinistra
                     pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C")
+                    
+                    pdf.set_x(10) # ECCO LA SOLUZIONE: riportiamo il cursore a capo!
                     pdf.multi_cell(0, 4, pulisci_testo("*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019)."), align="C")
 
                     # 7. EVENTUALI NOTE PERSONALIZZATE DEL CONSULENTE
@@ -453,8 +458,10 @@ if check_password():
                         pdf.ln(3)
                         pdf.set_font(pdf.f_f, "B", 9)
                         pdf.set_text_color(20, 20, 20)
+                        pdf.set_x(10) # Mettiamo il cursore a sinistra
                         pdf.multi_cell(0, 5, pulisci_testo(f"Note aggiuntive: {p['note']}"), align="C")
 
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
