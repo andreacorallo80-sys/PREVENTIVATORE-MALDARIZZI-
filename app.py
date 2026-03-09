@@ -48,6 +48,7 @@ if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
 if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
 if "val_anticipo" not in st.session_state: st.session_state["val_anticipo"] = 0.0
 if "val_cliente" not in st.session_state: st.session_state["val_cliente"] = "Gentile CLIENTE"
+if "val_tipo_cliente" not in st.session_state: st.session_state["val_tipo_cliente"] = "Partita IVA" # NUOVA VARIABILE
 if "val_input_mode" not in st.session_state: st.session_state["val_input_mode"] = "Da Listino"
 if "val_marca_stampa" not in st.session_state: st.session_state["val_marca_stampa"] = ""
 if "val_versione_stampa" not in st.session_state: st.session_state["val_versione_stampa"] = ""
@@ -115,13 +116,18 @@ if check_password():
             testo_upper = testo_flat.upper()
             st.session_state["debug_text"] = testo_flat
             st.session_state["val_input_mode"] = "Testo Libero"
+            
+            # AUTO-DETECT PRIVATO / PARTITA IVA
+            if "IVA INCLUSA" in testo_upper or "I.V.A. INCLUSA" in testo_upper or "CODICE FISCALE" in testo_upper or "C.F." in testo_upper or "PRIVATO" in testo_upper:
+                st.session_state["val_tipo_cliente"] = "Privato"
+            else:
+                st.session_state["val_tipo_cliente"] = "Partita IVA"
 
             brands = ['FIAT', 'CITROEN', 'FORD', 'AUDI', 'BMW', 'MERCEDES', 'VOLKSWAGEN', 'PEUGEOT', 'RENAULT', 'OPEL', 'ALFA ROMEO', 'JEEP', 'TOYOTA', 'NISSAN', 'VOLVO', 'KIA', 'HYUNDAI', 'DACIA', 'LANCIA', 'SEAT', 'CUPRA', 'SUZUKI', 'MAZDA', 'LAND ROVER', 'PORSCHE', 'TESLA', 'MINI', 'LEXUS', 'MASERATI', 'SMART', 'SKODA', 'HONDA', 'MG', 'DS', 'IVECO']
 
             # --- ESTRATTORE CHIRURGICO ---
             if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
                 
-                # 1. ESTRAZIONE CLIENTE AYVENS
                 m_cli = re.search(r':\s*([A-Za-z\s\,\'\.\-]+?)\s*\d{6,9}/\d{2,3}', testo_flat)
                 if m_cli: 
                     nome_raw = m_cli.group(1).strip()
@@ -132,11 +138,8 @@ if check_password():
                             nome_raw = " ".join(parti[:-1])
                     st.session_state["val_cliente"] = nome_raw.upper()
 
-                # 2. VEICOLO AYVENS (Logica potenziata per Land Rover, Alfa Romeo ecc.)
-                # Cerca prima nella sezione tecnica "Veicolo: ... Codici:"
                 m_vei = re.search(r'Veicolo:\s*(.*?)\s*Codici:', testo_flat, re.IGNORECASE)
                 if not m_vei:
-                    # Fallback nella sezione in alto se non trova la sezione tecnica
                     m_vei = re.search(r'Venduto\s+(?:OFFERTA\s+[A-Z]+\s+|[A-Z0-9]+\s+)?(.*?)\s+\d{2}/\d{2}/\d{4}', testo_flat, re.IGNORECASE)
                 
                 if m_vei:
@@ -144,15 +147,13 @@ if check_password():
                     if vei.endswith('.'): vei = vei[:-1].strip()
                     st.session_state["val_versione_stampa"] = vei
                     
-                    # Cerca esattamente la marca confrontandola col nostro database
-                    marca_trovata = vei.split()[0].upper() # default prima parola
+                    marca_trovata = vei.split()[0].upper()
                     for b in brands:
                         if vei.upper().startswith(b):
                             marca_trovata = b
                             break
                     st.session_state["val_marca_stampa"] = marca_trovata
 
-                # 3. DURATA E KM
                 m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{4,7})\s+€', testo_flat)
                 if m_dur_km:
                     st.session_state["val_durata"] = int(m_dur_km.group(1))
@@ -160,7 +161,6 @@ if check_password():
                     if st.session_state["val_durata"] > 0:
                         st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
 
-                # 4. CANONE E ANTICIPO
                 m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
                 if m_can:
                     valori = sorted([float(c.replace(',', '.')) for c in m_can], reverse=True)
@@ -214,12 +214,10 @@ if check_password():
                         st.session_state["val_note"] = f"Nota bene: il contratto include {franchigia_km} km di franchigia aggiuntivi da sommare al totale."
 
             elif "ARVAL" in testo_upper:
-                # ESTRAZIONE CLIENTE ARVAL
                 m_cli = re.search(r'Ragione Sociale\s+([A-Za-z0-9\s\&\.\'\-]+?)\s+(?:CF Cliente|C\.F\.|Codice\s*Fiscale|P\.?IVA|Partita\s*IVA)', testo_flat, re.IGNORECASE)
                 if m_cli: 
                     st.session_state["val_cliente"] = m_cli.group(1).strip().upper()
                 
-                # VEICOLO ARVAL POTENZIATO
                 m_vei = re.search(r'per il veicolo\s+(.*?)\s+Canone', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
@@ -296,6 +294,9 @@ if check_password():
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("👤 Cliente")
+        # NUOVO INTERRUTTORE PRIVATO / PARTITA IVA
+        idx_tipo_cli = 1 if st.session_state.get("val_tipo_cliente", "Partita IVA") == "Privato" else 0
+        tipo_cliente = st.radio("Tipologia", ["Partita IVA", "Privato"], index=idx_tipo_cli, horizontal=True)
         nome_cliente = st.text_input("Nome Cliente", value=st.session_state.get("val_cliente", ""))
         consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
         t_veicolo = st.radio("Stato Veicolo (Stampa)", ["Nuovo", "Usato"], horizontal=True)
@@ -350,8 +351,12 @@ if check_password():
     st.markdown("---")
     st.subheader("💸 Dati Economici")
     n1, n2, n3, n4 = st.columns(4)
-    with n1: canone = st.number_input("Canone/Mese (Euro)", value=float(st.session_state["val_canone"]))
-    with n2: anticipo = st.number_input("Anticipo (Euro)", value=float(st.session_state["val_anticipo"]))
+    
+    # ETICHETTE IVA DINAMICHE
+    iva_text = "Iva Inclusa" if tipo_cliente == "Privato" else "Iva Esclusa"
+    
+    with n1: canone = st.number_input(f"Canone/Mese ({iva_text})", value=float(st.session_state["val_canone"]))
+    with n2: anticipo = st.number_input(f"Anticipo ({iva_text})", value=float(st.session_state["val_anticipo"]))
     with n3: 
         idx_durata = [24, 36, 48, 60].index(st.session_state["val_durata"]) if st.session_state["val_durata"] in [24, 36, 48, 60] else 1
         durata = st.selectbox("Durata (Mesi)", [24, 36, 48, 60], index=idx_durata)
@@ -366,7 +371,8 @@ if check_password():
             "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
             "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
             "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
-            "canone": canone, "anticipo": anticipo, "durata": durata, "km": km
+            "canone": canone, "anticipo": anticipo, "durata": durata, "km": km,
+            "iva_text": iva_text # SALVIAMO IL DATO DELL'IVA PER IL PDF
         }
         st.session_state["lista_preventivi"].append(auto_aggiunta)
         st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
@@ -449,7 +455,7 @@ if check_password():
                         f"{p['durata']} mesi", 
                         f"Km {km_tot}", 
                         f"Anticipo {anticipo_str}", 
-                        "Iva esclusa"
+                        p['iva_text'] # IL PDF ORA SCRIVE "IVA INCLUSA" O "ESCLUSA" IN BASE ALLA SCELTA
                     ]
                     
                     larghezza_box = 42
