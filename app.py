@@ -48,10 +48,11 @@ if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
 if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
 if "val_anticipo" not in st.session_state: st.session_state["val_anticipo"] = 0.0
 if "val_cliente" not in st.session_state: st.session_state["val_cliente"] = "Gentile CLIENTE"
-if "val_tipo_cliente" not in st.session_state: st.session_state["val_tipo_cliente"] = "Partita IVA" # NUOVA VARIABILE
+if "val_tipo_cliente" not in st.session_state: st.session_state["val_tipo_cliente"] = "Partita IVA"
 if "val_input_mode" not in st.session_state: st.session_state["val_input_mode"] = "Da Listino"
 if "val_marca_stampa" not in st.session_state: st.session_state["val_marca_stampa"] = ""
 if "val_versione_stampa" not in st.session_state: st.session_state["val_versione_stampa"] = ""
+if "val_opt" not in st.session_state: st.session_state["val_opt"] = "" # NUOVA VARIABILE OPTIONAL
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
@@ -294,13 +295,14 @@ if check_password():
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("👤 Cliente")
-        # NUOVO INTERRUTTORE PRIVATO / PARTITA IVA
         idx_tipo_cli = 1 if st.session_state.get("val_tipo_cliente", "Partita IVA") == "Privato" else 0
         tipo_cliente = st.radio("Tipologia", ["Partita IVA", "Privato"], index=idx_tipo_cli, horizontal=True)
         nome_cliente = st.text_input("Nome Cliente", value=st.session_state.get("val_cliente", ""))
         consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
         t_veicolo = st.radio("Stato Veicolo (Stampa)", ["Nuovo", "Usato"], horizontal=True)
-        note_p = st.text_area("Note e optional", value=st.session_state.get("val_note", ""), height=70)
+        
+        # NOTE AGGIUNTIVE (Generiche)
+        note_p = st.text_area("Note aggiuntive", value=st.session_state.get("val_note", ""), height=70)
     
     with c2:
         st.subheader("🚘 Veicolo")
@@ -317,6 +319,8 @@ if check_password():
             marca_stampa = marca_sel
             versione_stampa = versione_sel
         
+        # NUOVO CAMPO OPTIONAL
+        opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
         foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
@@ -352,7 +356,6 @@ if check_password():
     st.subheader("💸 Dati Economici")
     n1, n2, n3, n4 = st.columns(4)
     
-    # ETICHETTE IVA DINAMICHE
     iva_text = "Iva Inclusa" if tipo_cliente == "Privato" else "Iva Esclusa"
     
     with n1: canone = st.number_input(f"Canone/Mese ({iva_text})", value=float(st.session_state["val_canone"]))
@@ -368,11 +371,12 @@ if check_password():
         auto_aggiunta = {
             "cliente": pulisci_testo(nome_cliente), "consegna": pulisci_testo(consegna), 
             "t_veicolo": pulisci_testo(t_veicolo), "note": pulisci_testo(note_p),
+            "opt": pulisci_testo(opt_p), # SALVO GLI OPTIONAL
             "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
             "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
             "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
             "canone": canone, "anticipo": anticipo, "durata": durata, "km": km,
-            "iva_text": iva_text # SALVIAMO IL DATO DELL'IVA PER IL PDF
+            "iva_text": iva_text 
         }
         st.session_state["lista_preventivi"].append(auto_aggiunta)
         st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
@@ -455,7 +459,7 @@ if check_password():
                         f"{p['durata']} mesi", 
                         f"Km {km_tot}", 
                         f"Anticipo {anticipo_str}", 
-                        p['iva_text'] # IL PDF ORA SCRIVE "IVA INCLUSA" O "ESCLUSA" IN BASE ALLA SCELTA
+                        p['iva_text'] 
                     ]
                     
                     larghezza_box = 42
@@ -489,6 +493,18 @@ if check_password():
                     pdf.set_x(10)
                     pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
+                    # 5b. OPTIONAL INCLUSI (Nuova sezione)
+                    if p.get('opt'):
+                        pdf.ln(2)
+                        pdf.set_font(pdf.f_f, "B", 10)
+                        pdf.set_text_color(201, 188, 65) # Colore oro per risaltare
+                        pdf.set_x(10)
+                        pdf.cell(0, 6, pulisci_testo("OPTIONAL INCLUSI"), ln=True, align="C")
+                        pdf.set_font(pdf.f_f, "", 8)
+                        pdf.set_text_color(255, 255, 255) # Testo bianco
+                        pdf.set_x(10)
+                        pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
+
                     # 6. DISCLAIMER E NOTE LEGALI
                     pdf.ln(3)
                     pdf.set_font(pdf.f_f, "I", 8)
@@ -500,6 +516,7 @@ if check_password():
                     pdf.set_x(10) 
                     pdf.multi_cell(0, 4, pulisci_testo("*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019)."), align="C")
 
+                    # 7. NOTE AGGIUNTIVE
                     if p['note']:
                         pdf.ln(2)
                         pdf.set_font(pdf.f_f, "B", 9)
