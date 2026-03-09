@@ -1,3 +1,25 @@
+import streamlit as st
+import pandas as pd
+import os
+import re
+import pypdf
+import io
+from fpdf import FPDF
+from datetime import datetime
+import locale
+
+# --- FUNZIONE PULIZIA TESTO ---
+def pulisci_testo(testo):
+    if not testo: return ""
+    testo = str(testo)
+    sostituzioni = {
+        '€': 'Euro', '\u2019': "'", '\u2018': "'", '\u201c': '"', '\u201d': '"',
+        '\u2013': '-', '\u2014': '-', '\u2022': '-', '\xa0': ' ', '\t': ' ', '\r': ''
+    }
+    for k, v in sostituzioni.items():
+        testo = testo.replace(k, v)
+    return testo.encode('latin-1', 'ignore').decode('latin-1')
+
 # --- 1. FUNZIONE LOGIN ---
 def check_password():
     if "authenticated" not in st.session_state:
@@ -474,6 +496,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
-
