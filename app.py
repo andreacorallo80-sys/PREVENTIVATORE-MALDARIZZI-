@@ -1,25 +1,3 @@
-import streamlit as st
-import pandas as pd
-import os
-import re
-import pypdf
-import io
-from fpdf import FPDF
-from datetime import datetime
-import locale
-
-# --- FUNZIONE PULIZIA TESTO ---
-def pulisci_testo(testo):
-    if not testo: return ""
-    testo = str(testo)
-    sostituzioni = {
-        '€': 'Euro', '\u2019': "'", '\u2018': "'", '\u201c': '"', '\u201d': '"',
-        '\u2013': '-', '\u2014': '-', '\u2022': '-', '\xa0': ' ', '\t': ' ', '\r': ''
-    }
-    for k, v in sostituzioni.items():
-        testo = testo.replace(k, v)
-    return testo.encode('latin-1', 'ignore').decode('latin-1')
-
 # --- 1. FUNZIONE LOGIN ---
 def check_password():
     if "authenticated" not in st.session_state:
@@ -58,7 +36,7 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 
 if check_password():
-  # --- 2. CLASSE PDF (LAYOUT CON SFONDO SCURO) ---
+    # --- 2. CLASSE PDF (LAYOUT CON SFONDO SCURO) ---
     class MaldarizziPDF(FPDF):
         def __init__(self):
             super().__init__()
@@ -76,7 +54,6 @@ if check_password():
                 try:
                     self.image("sfondo_nero.jpg", 0, 0, 210, 297)
                 except Exception:
-                    # Sfondo di riserva scuro se l'immagine non si carica
                     self.set_fill_color(20, 20, 20)
                     self.rect(0, 0, 210, 297, 'F')
             else:
@@ -96,6 +73,7 @@ if check_password():
                     self.image("logo.png", 145, 275, 55)
                 except Exception:
                     pass
+
     # --- 3. INTERFACCIA STREAMLIT ---
     st.set_page_config(page_title="Maldarizzi Copilota", layout="wide")
     try: locale.setlocale(locale.LC_TIME, "it_IT.UTF-8")
@@ -121,20 +99,46 @@ if check_password():
 
             brands = ['FIAT', 'CITROEN', 'FORD', 'AUDI', 'BMW', 'MERCEDES', 'VOLKSWAGEN', 'PEUGEOT', 'RENAULT', 'OPEL', 'ALFA ROMEO', 'JEEP', 'TOYOTA', 'NISSAN', 'VOLVO', 'KIA', 'HYUNDAI', 'DACIA', 'LANCIA', 'SEAT', 'CUPRA', 'SUZUKI', 'MAZDA', 'LAND ROVER', 'PORSCHE', 'TESLA', 'MINI', 'LEXUS', 'MASERATI', 'SMART', 'SKODA', 'HONDA', 'MG', 'DS', 'IVECO']
 
-            # 2. NUOVA ESTRAZIONE VEICOLO AYVENS (Ferma alla prima data)
-                # Cerca "Venduto", salta la sigla, cattura l'auto e si blocca appena vede una data (es. 01/01/2025)
+            # --- ESTRATTORE CHIRURGICO ---
+            if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
+                
+                # 1. NUOVA ESTRAZIONE CLIENTE AYVENS
+                m_cli = re.search(r':\s+([A-Z\s]+?)\s+[A-Z]+,', testo_flat)
+                if m_cli: 
+                    st.session_state["val_cliente"] = m_cli.group(1).strip()
+
+                # 2. NUOVA ESTRAZIONE VEICOLO AYVENS
                 m_vei = re.search(r'Venduto\s+(?:[A-Z0-9]+\s+)?(.*?)\s+\d{2}/\d{2}/\d{4}', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
-                    # Per sicurezza, togliamo eventuali puntini finali sbavati
                     if vei.endswith('.'): vei = vei[:-1].strip()
-                    
                     st.session_state["val_versione_stampa"] = vei
                     parti = vei.split()
                     if len(parti) > 0:
                         st.session_state["val_marca_stampa"] = parti[0].upper()
+
+                # 3. DURATA E KM
+                m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{4,7})\s+€', testo_flat)
+                if m_dur_km:
+                    st.session_state["val_durata"] = int(m_dur_km.group(1))
+                    km_tot = int(m_dur_km.group(2))
+                    if st.session_state["val_durata"] > 0:
+                        st.session_state["val_km"] = int((km_tot / st.session_state["val_durata"]) * 12)
+
+                # 4. CANONE
+                m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
+                if m_can:
+                    valori = sorted([float(c.replace(',', '.')) for c in m_can], reverse=True)
+                    if len(valori) > 0:
+                        massimo = valori[0]
+                        prezzo_corretto = massimo
+                        for v in valori:
+                            if abs(massimo - (v * 1.22)) < 1.0: 
+                                prezzo_corretto = v
+                                break
+                        st.session_state["val_canone"] = prezzo_corretto
                 
-                # ESTRAZIONE ANTICIPO AYVENS (Mirata)
+                # 5. ANTICIPO
                 m_ant = re.search(r'Anticipo\s*\(iva\s*esclusa\)\s*€\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
                     st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
@@ -166,10 +170,9 @@ if check_password():
                 if m_can:
                     st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
                     
-# --- ESTRAZIONE ANTICIPO LEASYS (Mirata per migliaia con spazio e IVA esclusa) ---
+                # ESTRAZIONE ANTICIPO LEASYS
                 m_ant = re.search(r'Anticipo\s*€\s*([\d\s]+[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
-                    # Cattura il primo importo (es. "5 000,00"), toglie gli spazi vuoti e cambia la virgola in punto
                     valore_pulito = m_ant.group(1).replace(' ', '').replace(',', '.')
                     st.session_state["val_anticipo"] = float(valore_pulito)
                 
@@ -206,7 +209,6 @@ if check_password():
                     else:
                         st.session_state["val_km"] = km_tot
                 
-                # ESTRAZIONE ANTICIPO ARVAL
                 m_ant = re.search(r'Anticipo\s*(?:€|Euro)?\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_ant:
                     st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
@@ -344,7 +346,7 @@ if check_password():
                 st.rerun()
                 
         with col_stampa:
-           if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
+            if st.button("🚀 STAMPA PREVENTIVO UNICO (DESIGN UFFICIALE)"):
                 st.markdown("""
                     <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999;">
                         <style>@keyframes fall { 0% { transform: translateY(-10vh); opacity: 1; } 100% { transform: translateY(110vh); opacity: 0; } } .car { position: absolute; font-size: 40px; animation: fall 2s linear forwards; }</style>
@@ -359,11 +361,11 @@ if check_password():
                     # 0. NOME CLIENTE AL CENTRO (Testo Bianco)
                     pdf.set_y(20)
                     pdf.set_font(pdf.f_f, "", 12)
-                    pdf.set_text_color(200, 200, 200) # Grigio chiaro per l'etichetta
+                    pdf.set_text_color(200, 200, 200) # Grigio chiaro
                     pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
                     
                     pdf.set_font(pdf.f_f, "B", 16)
-                    pdf.set_text_color(255, 255, 255) # BIANCO per il nome
+                    pdf.set_text_color(255, 255, 255) # BIANCO 
                     pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
                     
                     # 1. TITOLO AUTO (Testo Bianco)
@@ -393,7 +395,7 @@ if check_password():
                     pdf.set_text_color(201, 188, 65) # ORO
                     pdf.cell(0, 15, pulisci_testo(f"Euro {p['canone']} / mese"), align="C", ln=True)
                     
-                    # 4. BOTTONI DATI (Sfondo grigio scuro, Testo Bianco)
+                    # 4. BOTTONI DATI
                     pdf.set_y(180)
                     pdf.set_font(pdf.f_f, "B", 11)
                     pdf.set_text_color(255, 255, 255)
@@ -416,7 +418,7 @@ if check_password():
                         pdf.set_xy(x_pos, 180)
                         pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                     
-                    # 5. SERVIZI INCLUSI (Testo Bianco)
+                    # 5. SERVIZI INCLUSI 
                     pdf.set_y(202)
                     pdf.set_font(pdf.f_f, "B", 11)
                     pdf.set_text_color(255, 255, 255) # BIANCO
