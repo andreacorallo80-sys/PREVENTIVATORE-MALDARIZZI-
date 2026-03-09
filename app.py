@@ -414,11 +414,16 @@ if check_password():
                         except Exception:
                             pass
                     
-                    # 3. PREZZO GIGANTE IN ORO MALDARIZZI
-                    pdf.set_y(160) 
-                    pdf.set_font(pdf.f_f, "B", 40)
+                   # 3. PREZZO GIGANTE IN ORO MALDARIZZI
+                    pdf.set_y(155) # Ho alzato leggermente la Y per fare spazio al font più grande
+                    pdf.set_font(pdf.f_f, "B", 50) # Font aumentato da 40 a 50 (Ora è enorme!)
                     pdf.set_text_color(201, 188, 65) # ORO
-                    pdf.cell(0, 15, pulisci_testo(f"Euro {p['canone']} / mese"), align="C", ln=True)
+                    
+                    # Pulizia estetica: toglie il ".0" finale se il numero è intero
+                    canone_str = str(p['canone'])
+                    if canone_str.endswith(".0"): canone_str = canone_str[:-2]
+                    
+                    pdf.cell(0, 15, pulisci_testo(f"Euro {canone_str} / mese"), align="C", ln=True)
                     
                     # 4. BOTTONI DATI
                     pdf.set_y(180)
@@ -427,10 +432,16 @@ if check_password():
                     pdf.set_fill_color(40, 40, 40) # Grigio scuro per staccare dal nero
                     
                     km_tot = int(p['km']) * int(p['durata']) // 12
+                    
+                    # Pulizia estetica anche per l'anticipo
+                    anticipo_str = str(p['anticipo'])
+                    if anticipo_str.endswith(".0"): anticipo_str = anticipo_str[:-2]
+                    
+                    # VOCI INVERTITE (Prima i mesi, poi i Km)
                     voci = [
-                        f"Km {km_tot}", 
                         f"{p['durata']} mesi", 
-                        f"Anticipo {p['anticipo']}", 
+                        f"Km {km_tot}", 
+                        f"Anticipo {anticipo_str}", 
                         "Iva esclusa"
                     ]
                     
@@ -499,4 +510,5 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
