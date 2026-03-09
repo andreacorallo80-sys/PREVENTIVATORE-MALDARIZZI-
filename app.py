@@ -377,7 +377,8 @@ if check_password():
 
                 pdf = MaldarizziPDF()
                 
-                for p in st.session_state["lista_preventivi"]:
+                # Aggiungiamo 'enumerate' per contare a quale auto siamo arrivati (i)
+                for i, p in enumerate(st.session_state["lista_preventivi"]):
                     pdf.add_page()
                     
                     # 0. NOME CLIENTE AL CENTRO (Testo Bianco)
@@ -397,10 +398,12 @@ if check_password():
                     titolo_auto = pulisci_testo(f"{p['marca']} {p['versione']}")
                     pdf.multi_cell(0, 10, titolo_auto, align="C")
                     
-                    # 2. IMMAGINE AUTO
+                    # 2. IMMAGINE AUTO (Risolto il bug delle foto duplicate!)
                     y_img = pdf.get_y() + 2
-                    f_path = "tmp_multi.png"
+                    
                     if p["foto_bytes"]:
+                        # Creiamo un nome file UNICO usando il numero dell'auto (i)
+                        f_path = f"tmp_multi_{i}.png" 
                         with open(f_path, "wb") as f: f.write(p["foto_bytes"])
                     else:
                         f_path = f"foto_vetture/{p['marca'].upper()}.jpg"
@@ -496,3 +499,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
