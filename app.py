@@ -116,6 +116,8 @@ if check_password():
             st.session_state["debug_text"] = testo_flat
             st.session_state["val_input_mode"] = "Testo Libero"
 
+            brands = ['FIAT', 'CITROEN', 'FORD', 'AUDI', 'BMW', 'MERCEDES', 'VOLKSWAGEN', 'PEUGEOT', 'RENAULT', 'OPEL', 'ALFA ROMEO', 'JEEP', 'TOYOTA', 'NISSAN', 'VOLVO', 'KIA', 'HYUNDAI', 'DACIA', 'LANCIA', 'SEAT', 'CUPRA', 'SUZUKI', 'MAZDA', 'LAND ROVER', 'PORSCHE', 'TESLA', 'MINI', 'LEXUS', 'MASERATI', 'SMART', 'SKODA', 'HONDA', 'MG', 'DS', 'IVECO']
+
             # --- ESTRATTORE CHIRURGICO ---
             if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
                 
@@ -130,15 +132,25 @@ if check_password():
                             nome_raw = " ".join(parti[:-1])
                     st.session_state["val_cliente"] = nome_raw.upper()
 
-                # 2. VEICOLO
-                m_vei = re.search(r'Venduto\s+(?:[A-Z0-9]+\s+)?(.*?)\s+\d{2}/\d{2}/\d{4}', testo_flat, re.IGNORECASE)
+                # 2. VEICOLO AYVENS (Logica potenziata per Land Rover, Alfa Romeo ecc.)
+                # Cerca prima nella sezione tecnica "Veicolo: ... Codici:"
+                m_vei = re.search(r'Veicolo:\s*(.*?)\s*Codici:', testo_flat, re.IGNORECASE)
+                if not m_vei:
+                    # Fallback nella sezione in alto se non trova la sezione tecnica
+                    m_vei = re.search(r'Venduto\s+(?:OFFERTA\s+[A-Z]+\s+|[A-Z0-9]+\s+)?(.*?)\s+\d{2}/\d{2}/\d{4}', testo_flat, re.IGNORECASE)
+                
                 if m_vei:
                     vei = m_vei.group(1).strip()
                     if vei.endswith('.'): vei = vei[:-1].strip()
                     st.session_state["val_versione_stampa"] = vei
-                    parti = vei.split()
-                    if len(parti) > 0:
-                        st.session_state["val_marca_stampa"] = parti[0].upper()
+                    
+                    # Cerca esattamente la marca confrontandola col nostro database
+                    marca_trovata = vei.split()[0].upper() # default prima parola
+                    for b in brands:
+                        if vei.upper().startswith(b):
+                            marca_trovata = b
+                            break
+                    st.session_state["val_marca_stampa"] = marca_trovata
 
                 # 3. DURATA E KM
                 m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{4,7})\s+€', testo_flat)
@@ -207,12 +219,18 @@ if check_password():
                 if m_cli: 
                     st.session_state["val_cliente"] = m_cli.group(1).strip().upper()
                 
+                # VEICOLO ARVAL POTENZIATO
                 m_vei = re.search(r'per il veicolo\s+(.*?)\s+Canone', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
-                    parti = vei.split()
-                    if len(parti) > 0: st.session_state["val_marca_stampa"] = parti[0]
                     st.session_state["val_versione_stampa"] = vei
+                    
+                    marca_trovata = vei.split()[0].upper()
+                    for b in brands:
+                        if vei.upper().startswith(b):
+                            marca_trovata = b
+                            break
+                    st.session_state["val_marca_stampa"] = marca_trovata
 
                 m_can = re.search(r'Canone\s+(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
                 if m_can: st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
@@ -498,4 +516,3 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
