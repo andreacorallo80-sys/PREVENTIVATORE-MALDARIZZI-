@@ -121,26 +121,18 @@ if check_password():
 
             brands = ['FIAT', 'CITROEN', 'FORD', 'AUDI', 'BMW', 'MERCEDES', 'VOLKSWAGEN', 'PEUGEOT', 'RENAULT', 'OPEL', 'ALFA ROMEO', 'JEEP', 'TOYOTA', 'NISSAN', 'VOLVO', 'KIA', 'HYUNDAI', 'DACIA', 'LANCIA', 'SEAT', 'CUPRA', 'SUZUKI', 'MAZDA', 'LAND ROVER', 'PORSCHE', 'TESLA', 'MINI', 'LEXUS', 'MASERATI', 'SMART', 'SKODA', 'HONDA', 'MG', 'DS', 'IVECO']
 
-            # --- ESTRATTORE CHIRURGICO ---
-            if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
-                
-                # 1. NUOVA ESTRAZIONE CLIENTE AYVENS
-                # Cerca i due punti, cattura il nome e ignora il cognome ripetuto prima della virgola
-                m_cli = re.search(r':\s+([A-Z\s]+?)\s+[A-Z]+,', testo_flat)
-                if m_cli: 
-                    st.session_state["val_cliente"] = m_cli.group(1).strip()
-
-                # 2. NUOVA ESTRAZIONE VEICOLO AYVENS
-                # Cerca "Venduto", salta la sigla (es. 4VANTAGE) e cattura fino al punto
-                m_vei = re.search(r'Venduto\s+(?:[A-Z0-9]+\s+)?(.*?)\.', testo_flat, re.IGNORECASE)
+            # 2. NUOVA ESTRAZIONE VEICOLO AYVENS (Ferma alla prima data)
+                # Cerca "Venduto", salta la sigla, cattura l'auto e si blocca appena vede una data (es. 01/01/2025)
+                m_vei = re.search(r'Venduto\s+(?:[A-Z0-9]+\s+)?(.*?)\s+\d{2}/\d{2}/\d{4}', testo_flat, re.IGNORECASE)
                 if m_vei:
                     vei = m_vei.group(1).strip()
+                    # Per sicurezza, togliamo eventuali puntini finali sbavati
+                    if vei.endswith('.'): vei = vei[:-1].strip()
+                    
                     st.session_state["val_versione_stampa"] = vei
                     parti = vei.split()
                     if len(parti) > 0:
                         st.session_state["val_marca_stampa"] = parti[0].upper()
-
-                # (Da qui in giù lasci intatte le formule per Durata, Canone e Anticipo che già avevi...)
                 
                 # ESTRAZIONE ANTICIPO AYVENS (Mirata)
                 m_ant = re.search(r'Anticipo\s*\(iva\s*esclusa\)\s*€\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
@@ -480,5 +472,6 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
 
