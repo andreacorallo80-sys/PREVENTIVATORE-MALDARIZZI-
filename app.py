@@ -515,7 +515,11 @@ if check_password():
                     
                     pdf.set_x(10) 
                     pdf.multi_cell(0, 4, pulisci_testo("*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019)."), align="C")
-
+                    
+                    # STRINGA VALIDITA' OFFERTA
+                    pdf.set_x(10) 
+                    pdf.multi_cell(0, 4, pulisci_testo(f"*La presente offerta ha una validità di {g_validita} giorni."), align="C")
+                    
                     # 7. NOTE AGGIUNTIVE
                     if p['note']:
                         pdf.ln(2)
@@ -539,3 +543,4 @@ if check_password():
                 pdf.output("preventivo_multiplo.pdf")
                 with open("preventivo_multiplo.pdf", "rb") as f:
                     st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
