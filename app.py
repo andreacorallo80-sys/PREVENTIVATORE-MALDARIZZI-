@@ -20,7 +20,7 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- DATABASE VENDITORI COMPLETO ---
+# --- DATABASE VENDITORI COMPLETO E CORRETTO ---
 DATABASE_UTENTI = {
     "v.catino": {"pw": "Maldarizzi2026", "nome": "VANESSA CATINO", "email": "v.catino@maldarizzi.com", "tel": "366 449 1633", "ruolo": "interno"},
     "f.manuto": {"pw": "Maldarizzi2026", "nome": "FRANCESCO MANUTO", "email": "f.manuto@maldarizzi.com", "tel": "342 353 1514", "ruolo": "interno"},
@@ -29,7 +29,7 @@ DATABASE_UTENTI = {
     "a.pierro": {"pw": "Maldarizzi2026", "nome": "ANGELA PIERRO", "email": "a.pierro@maldarizzi.com", "tel": "388 928 5242", "ruolo": "interno"},
     "s.carlucci": {"pw": "Maldarizzi2026", "nome": "SAVERIO CARLUCCI", "email": "saverio.carlucci@maldarizzi.com", "tel": "337 232 984", "ruolo": "interno"},
     "l.grieco": {"pw": "Maldarizzi2026", "nome": "LUCA GRIECO", "email": "l.grieco@maldarizzi.com", "tel": "345 252 4566", "ruolo": "interno"},
-    "m.schiralli": {"pw": "Maldarizzi2026", "nome": "MICHELE SCHIRALLI", "email": "m.schiralli@maldarizzi.com", "tel": "327 681 0137", "ruolo": "interno"},
+    "m.schiralli": {"pw": "Maldarizzi2026", "nome": "MICHELE SCHIRALLI", "email": "m.schiralli@maldarizzi.com", "tel": "327 6810137", "ruolo": "interno"},
     "d.catanzaro": {"pw": "Maldarizzi2026", "nome": "DORIANA CATANZARO", "email": "d.catanzaro@maldarizzi.com", "tel": "349 756 8629", "ruolo": "interno"},
     "v.schiralli": {"pw": "Maldarizzi2026", "nome": "VINCENZO SCHIRALLI", "email": "v.schiralli@maldarizzi.com", "tel": "327 681 0137", "ruolo": "interno"},
     "a.lozito": {"pw": "Maldarizzi2026", "nome": "ALESSANDRA LOZITO", "email": "a.lozito@maldarizzi.com", "tel": "340 450 7513", "ruolo": "interno"},
@@ -50,7 +50,7 @@ def check_password():
             if os.path.exists("logo.png"): 
                 st.image("logo.png", width=200)
             st.subheader("Portale Noleggio Maldarizzi")
-            user = st.text_input("Username (es. v.catino)").lower().strip()
+            user = st.text_input("Username (es. a.corallo)").lower().strip()
             password = st.text_input("Password", type="password")
             if st.button("Accedi"):
                 if user in DATABASE_UTENTI and password == DATABASE_UTENTI[user]["pw"]:
@@ -62,8 +62,10 @@ def check_password():
         return False
     return True
 
-# --- INIZIALIZZAZIONE VARIABILI IN MEMORIA (PER IL PREVENTIVATORE E MENU) ---
-if "menu_scelta" not in st.session_state: st.session_state["menu_scelta"] = "🔥 Offerte del Mese"
+# --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
+# Sistema di navigazione blindato per evitare KeyError
+if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
+
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
@@ -132,8 +134,17 @@ if check_password():
     st.sidebar.markdown(f"🏷️ Ruolo: *{utente_loggato['ruolo'].upper()}*")
     st.sidebar.markdown("---")
     
-    # Il Radio button ora è legato alla variabile di sessione (permette il salto automatico)
-    menu_scelta = st.sidebar.radio("📌 MENU PRINCIPALE", ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"], key="menu_scelta")
+    # Costruzione Logica del Menu per navigazione sicura
+    opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
+    try: idx_menu = opzioni_menu.index(st.session_state["pagina_attiva"])
+    except: idx_menu = 0
+
+    menu_scelta = st.sidebar.radio("📌 MENU PRINCIPALE", opzioni_menu, index=idx_menu)
+    
+    # Se l'utente clicca un'opzione diversa dal menu laterale, cambiamo la pagina
+    if menu_scelta != st.session_state["pagina_attiva"]:
+        st.session_state["pagina_attiva"] = menu_scelta
+        st.rerun()
     
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 Esci"):
@@ -143,7 +154,7 @@ if check_password():
     # ==========================================
     # SEZIONE 1: DASHBOARD PROMO (VETRINA DA EXCEL)
     # ==========================================
-    if st.session_state["menu_scelta"] == "🔥 Offerte del Mese":
+    if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
         st.title("🔥 Promozioni del Mese")
         st.markdown("Sfoglia le offerte, verifica i dettagli e trasferiscile nel preventivatore con un clic.")
         
@@ -158,7 +169,6 @@ if check_password():
         if os.path.exists("promo_mese.xlsx"):
             try:
                 df_promo = pd.read_excel("promo_mese.xlsx")
-                # Pulizia severa degli spazi nei nomi delle colonne
                 df_promo.columns = df_promo.columns.str.strip()
                 df_promo = df_promo.fillna("") 
                 
@@ -166,7 +176,6 @@ if check_password():
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
-                    # Se non esiste la colonna alimentazione la saltiamo
                     if 'ALIMENTAZIONE' in df_promo.columns:
                         lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
@@ -185,7 +194,6 @@ if check_password():
                     else:
                         alimen = ""
 
-                    # Lettura nuovi campi richiesti
                     offerta_tipo = str(row.get('OFFERTA', '')).strip()
                     player = str(row.get('PLAYER', '')).strip().upper()
                     commissioni = str(row.get('COMMISSIONI', '')).strip()
@@ -217,8 +225,11 @@ if check_password():
                     colonne_griglia = st.columns(3)
                     for idx, auto in enumerate(offerte_filtrate):
                         with colonne_griglia[idx % 3]:
-                            # Costruiamo il blocco HTML per mostrare i dati tecnici
-                            link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41; text-decoration: none; font-size: 13px;">🔗 Apri pagina Offerta</a>' if auto["link"] else ""
+                            # GESTIONE SICURA DEL LINK WEB
+                            if auto["link"] and str(auto["link"]).startswith("http"):
+                                link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41; text-decoration: none; font-size: 13px;">🔗 Apri pagina Offerta Web</a>'
+                            else:
+                                link_html = '<span style="color: #888; font-size: 12px; font-style: italic;">Nessun link web valido inserito nel database</span>'
                             
                             st.markdown(f"""
                             <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-bottom: 15px;">
@@ -239,7 +250,7 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # IL BOTTONE MAGICO: TRASFERISCE I DATI E CAMBIA SCHERMATA
+                            # IL BOTTONE MAGICO CHE CAMBIA PAGINA IN MODO SICURO
                             if st.button(f"➡️ Usa Promo {auto['marca']}", key=f"btn_promo_{idx}"):
                                 st.session_state["val_marca_stampa"] = auto['marca']
                                 st.session_state["val_versione_stampa"] = auto['modello']
@@ -248,8 +259,9 @@ if check_password():
                                 st.session_state["val_durata"] = auto['durata']
                                 st.session_state["val_km"] = auto['km']
                                 st.session_state["val_input_mode"] = "Testo Libero"
-                                # Salta alla pagina Preventivatore
-                                st.session_state["menu_scelta"] = "🎯 Preventivatore Strumentale"
+                                
+                                # Aggiorna la variabile sicura per il teletrasporto!
+                                st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
                                 st.rerun()
 
             except Exception as e:
@@ -261,7 +273,7 @@ if check_password():
     # ==========================================
     # SEZIONE 2: PREVENTIVATORE STRUMENTALE
     # ==========================================
-    elif st.session_state["menu_scelta"] == "🎯 Preventivatore Strumentale":
+    elif st.session_state["pagina_attiva"] == "🎯 Preventivatore Strumentale":
         st.title("🎯 Preventivatore Strumentale")
         
         st.sidebar.header("📥 Importa PDF Portale")
@@ -682,4 +694,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
