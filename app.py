@@ -20,10 +20,24 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- DATABASE VENDITORI CON RUOLI ---
+# --- DATABASE VENDITORI COMPLETO (Trascritto dall'immagine) ---
 DATABASE_UTENTI = {
-    "grazia": {"pw": "maldarizzi1", "nome": "GRAZIA DEL VECCHIO", "email": "g.delvecchio@maldarizzi.com", "tel": "080 5322212", "ruolo": "interno"},
-    "mario": {"pw": "broker2024", "nome": "MARIO ROSSI", "email": "m.rossi@partner.com", "tel": "333 1234567", "ruolo": "esterno"},
+    "n.pellegrino": {"pw": "Maldarizzi2026", "nome": "NICOLA PELLEGRINO", "email": "n.pellegrino@maldarizzi.com", "tel": "393 015 6757", "ruolo": "interno"},
+    "m.abbatantuono": {"pw": "Maldarizzi2026", "nome": "MICHELE ABBATANTUONO", "email": "m.abbatantuono@maldarizzi.com", "tel": "393 015 6758", "ruolo": "interno"},
+    "g.perna": {"pw": "Maldarizzi2026", "nome": "GIUSEPPE PERNA", "email": "g.perna@maldarizzi.com", "tel": "393 015 6759", "ruolo": "interno"},
+    "a.massa": {"pw": "Maldarizzi2026", "nome": "ANGELA MASSA", "email": "a.massa@maldarizzi.com", "tel": "393 015 6760", "ruolo": "interno"},
+    "m.luisi": {"pw": "Maldarizzi2026", "nome": "MARIA LUISI", "email": "m.luisi@maldarizzi.com", "tel": "393 015 6761", "ruolo": "interno"},
+    "l.diliddo": {"pw": "Maldarizzi2026", "nome": "LUCA DI LIDDO", "email": "l.diliddo@maldarizzi.com", "tel": "393 015 6762", "ruolo": "interno"},
+    "m.liso": {"pw": "Maldarizzi2026", "nome": "MARCO LISO", "email": "m.liso@maldarizzi.com", "tel": "393 015 6763", "ruolo": "interno"},
+    "a.depalo": {"pw": "Maldarizzi2026", "nome": "ALESSANDRO DE PALO", "email": "a.depalo@maldarizzi.com", "tel": "393 015 6764", "ruolo": "interno"},
+    "g.delvecchio": {"pw": "Maldarizzi2026", "nome": "GRAZIA DEL VECCHIO", "email": "g.delvecchio@maldarizzi.com", "tel": "393 015 6765", "ruolo": "interno"},
+    "o.campi": {"pw": "Maldarizzi2026", "nome": "ORAZIO CAMPI", "email": "o.campi@maldarizzi.com", "tel": "393 015 6766", "ruolo": "interno"},
+    "g.morelli": {"pw": "Maldarizzi2026", "nome": "GIUSEPPE MORELLI", "email": "g.morelli@maldarizzi.com", "tel": "393 015 6767", "ruolo": "interno"},
+    "g.debellis": {"pw": "Maldarizzi2026", "nome": "GIOVANNI DE BELLIS", "email": "g.debellis@maldarizzi.com", "tel": "393 015 6768", "ruolo": "interno"},
+    "d.cassone": {"pw": "Maldarizzi2026", "nome": "DOMENICO CASSONE", "email": "d.cassone@maldarizzi.com", "tel": "393 015 6769", "ruolo": "interno"},
+    "v.valeriano": {"pw": "Maldarizzi2026", "nome": "VITO VALERIANO", "email": "v.valeriano@maldarizzi.com", "tel": "393 015 6770", "ruolo": "interno"},
+    "s.piccarreta": {"pw": "Maldarizzi2026", "nome": "SAVERIO PICCARRETA", "email": "s.piccarreta@maldarizzi.com", "tel": "393 015 6771", "ruolo": "interno"},
+    "m.sannicandro": {"pw": "Maldarizzi2026", "nome": "MATTEO SANNICANDRO", "email": "m.sannicandro@maldarizzi.com", "tel": "393 015 6772", "ruolo": "interno"},
     "admin": {"pw": "cipiacemigliorare", "nome": "ADMIN MALDARIZZI", "email": "admin@maldarizzi.com", "tel": "000 0000000", "ruolo": "interno"}
 }
 
@@ -40,7 +54,7 @@ def check_password():
             if os.path.exists("logo.png"): 
                 st.image("logo.png", width=200)
             st.subheader("Portale Noleggio Maldarizzi")
-            user = st.text_input("Username (es. grazia)").lower().strip()
+            user = st.text_input("Username (es. a.massa)").lower().strip()
             password = st.text_input("Password", type="password")
             if st.button("Accedi"):
                 if user in DATABASE_UTENTI and password == DATABASE_UTENTI[user]["pw"]:
@@ -52,7 +66,7 @@ def check_password():
         return False
     return True
 
-# --- INIZIALIZZAZIONE VARIABILI IN MEMORIA (PER IL PREVENTIVATORE) ---
+# --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
@@ -103,7 +117,6 @@ class MaldarizziPDF(FPDF):
                 self.image("logo.png", 145, 275, 55)
             except Exception: pass
 
-
 # ==========================================
 # AVVIO APP PRINCIPALE
 # ==========================================
@@ -114,7 +127,7 @@ except: pass
 if check_password():
     utente_loggato = st.session_state["current_user"]
     
-    # --- MENU DI NAVIGAZIONE LATERALE (Fixato il testo strano) ---
+    # --- MENU DI NAVIGAZIONE LATERALE ---
     if os.path.exists("logo.png"):
         st.sidebar.image("logo.png", width=180)
         
@@ -130,11 +143,11 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: DASHBOARD PROMO (CON LETTURA DA EXCEL)
+    # SEZIONE 1: DASHBOARD PROMO (VETRINA DA EXCEL)
     # ==========================================
     if menu_scelta == "🔥 Offerte del Mese":
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le nostre migliori offerte disponibili in base al file di caricamento mensile.")
+        st.markdown("Sfoglia le nostre migliori offerte disponibili e scarica la locandina in PDF.")
         
         # UPLOAD DEL FILE EXCEL PROMO
         st.sidebar.header("📥 Gestione Database Promo")
@@ -144,34 +157,27 @@ if check_password():
                 f.write(file_promo.getbuffer())
             st.sidebar.success("✅ Database Promozioni aggiornato!")
 
-        # SE IL FILE ESISTE, CREIAMO LA VETRINA
         if os.path.exists("promo_mese.xlsx"):
             try:
-                # Leggiamo il file Excel
                 df_promo = pd.read_excel("promo_mese.xlsx")
-                # Pulizia colonne (elimina gli spazi vuoti accidentali come "MARCA ")
                 df_promo.columns = df_promo.columns.str.strip()
-                df_promo = df_promo.fillna("") # Togliamo i fastidiosi "NaN"
+                df_promo = df_promo.fillna("") 
                 
-                # --- Filtri Dinamici ---
                 c_search, c_alimen = st.columns([2, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
-                    # Crea la lista delle alimentazioni leggendole dal tuo file
                     lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
                     filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
                 
                 st.markdown("---")
                 
-                # --- Creazione Vetrina ---
                 offerte_filtrate = []
                 for _, row in df_promo.iterrows():
                     marca = str(row.get('MARCA', '')).strip().upper()
                     modello = str(row.get('MODELLO', '')).strip()
                     alimen = str(row.get('ALIMENTAZIONE', '')).strip().upper()
                     
-                    # Convertiamo in numero gestendo i casi strani
                     try: canone = int(float(str(row.get('CANONE', 0)).replace(',','.')))
                     except: canone = 0
                     try: anticipo = int(float(str(row.get('ANTICIPO', 0)).replace(',','.')))
@@ -181,11 +187,8 @@ if check_password():
                     try: km = int(row.get('KM TOTALI', 0))
                     except: km = 0
 
-                    # Applichiamo il filtro di Ricerca
                     if ricerca and ricerca not in marca and ricerca not in modello.upper():
                         continue
-                    
-                    # Applichiamo il filtro di Alimentazione
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen:
                         continue
                         
@@ -194,7 +197,6 @@ if check_password():
                         "anticipo": anticipo, "durata": mesi, "km": km
                     })
                 
-                # Visualizzazione in griglia a 3 colonne
                 if not offerte_filtrate:
                     st.warning("Nessuna offerta trovata con questi parametri.")
                 else:
@@ -213,12 +215,11 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                           # --- SISTEMA DI GENERAZIONE PDF REALE PER LA VETRINA ---
+                            # --- SISTEMA DI GENERAZIONE PDF REALE PER LA VETRINA ---
                             if st.button(f"📄 Prepara Offerta {auto['marca']}", key=f"btn_promo_{idx}"):
                                 pdf = MaldarizziPDF()
                                 pdf.add_page()
                                 
-                                # 0. INTESTAZIONE
                                 pdf.set_y(20)
                                 pdf.set_font(pdf.f_f, "", 12)
                                 pdf.set_text_color(200, 200, 200)
@@ -227,21 +228,18 @@ if check_password():
                                 pdf.set_text_color(255, 255, 255) 
                                 pdf.cell(0, 7, "GENTILE CLIENTE", align="C", ln=True)
                                 
-                                # 1. TITOLO AUTO
                                 pdf.set_y(45)
                                 pdf.set_font(pdf.f_f, "B", 24)
                                 pdf.set_text_color(255, 255, 255)
                                 titolo_auto = pulisci_testo(f"{auto['marca']} {auto['modello']}")
                                 pdf.multi_cell(0, 10, titolo_auto, align="C")
                                 
-                                # 2. IMMAGINE AUTO (Prende in automatico quella della cartella foto_vetture)
                                 y_img = pdf.get_y() + 2
                                 f_path = f"foto_vetture/{auto['marca'].upper()}.jpg"
                                 if os.path.exists(f_path):
                                     try: pdf.image(f_path, 25, y_img, 160)
                                     except: pass
                                 
-                                # 3. PREZZO GIGANTE
                                 pdf.set_y(155)
                                 pdf.set_font(pdf.f_f, "B", 50) 
                                 pdf.set_text_color(201, 188, 65) 
@@ -249,7 +247,6 @@ if check_password():
                                 if canone_str.endswith(".0"): canone_str = canone_str[:-2]
                                 pdf.cell(0, 15, pulisci_testo(f"Euro {canone_str} / mese"), align="C", ln=True)
                                 
-                                # 4. BOTTONI DATI
                                 pdf.set_y(180)
                                 pdf.set_font(pdf.f_f, "B", 11)
                                 pdf.set_text_color(255, 255, 255)
@@ -262,7 +259,7 @@ if check_password():
                                     f"{auto['durata']} mesi", 
                                     f"Km {auto['km']}", 
                                     f"Anticipo {anticipo_str}", 
-                                    "Iva esclusa" # Standard per promozioni vetrina
+                                    "Iva esclusa"
                                 ]
                                 
                                 larghezza_box = 42
@@ -274,7 +271,6 @@ if check_password():
                                     pdf.set_xy(x_pos, 180)
                                     pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                                 
-                                # 5. SERVIZI INCLUSI (Testo generico per locandina rapida)
                                 pdf.set_y(202)
                                 pdf.set_font(pdf.f_f, "B", 11)
                                 pdf.set_text_color(255, 255, 255)
@@ -285,14 +281,12 @@ if check_password():
                                 pdf.set_x(10)
                                 pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
-                                # 6. NOTE LEGALI
                                 pdf.ln(5)
                                 pdf.set_font(pdf.f_f, "I", 8)
                                 pdf.set_text_color(180, 180, 180) 
                                 pdf.set_x(10) 
                                 pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale. Offerta soggetta ad approvazione della società di noleggio."), align="C")
 
-                                # 8. RIFERIMENTI VENDITORE (Automatici in base al login)
                                 pdf.set_y(255)
                                 pdf.set_font(pdf.f_f, "B", 10)
                                 pdf.set_text_color(255, 255, 255)
@@ -303,13 +297,12 @@ if check_password():
                                 pdf.set_x(10)
                                 pdf.cell(0, 5, pulisci_testo(f"E-mail: {utente_loggato['email']}  |  Tel: {utente_loggato['tel']}"), align="C", ln=True)
 
-                                # SALVA IL PDF IN MEMORIA
                                 file_name = f"Promo_{auto['marca']}_{idx}.pdf"
                                 pdf.output(file_name)
                                 st.session_state[f"pdf_ready_{idx}"] = file_name
                                 st.rerun()
 
-                            # MOSTRA IL PULSANTE DI DOWNLOAD QUANDO IL PDF È PRONTO
+                            # MOSTRA IL TASTO SCARICA
                             if st.session_state.get(f"pdf_ready_{idx}"):
                                 with open(st.session_state[f"pdf_ready_{idx}"], "rb") as f:
                                     st.download_button(
@@ -326,7 +319,7 @@ if check_password():
 
 
     # ==========================================
-    # SEZIONE 2: PREVENTIVATORE STRUMENTALE (IL VECCHIO CODICE)
+    # SEZIONE 2: PREVENTIVATORE STRUMENTALE
     # ==========================================
     elif menu_scelta == "🎯 Preventivatore Strumentale":
         st.title("🎯 Preventivatore Strumentale")
@@ -495,8 +488,23 @@ if check_password():
                 st.write(st.session_state["debug_text"])
 
         st.sidebar.markdown("---")
-        g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
+        st.sidebar.header("📁 Database Listino")
+        uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
+        if uploaded_excel:
+            with open("dati.xlsx", "wb") as f: f.write(uploaded_excel.getbuffer())
+            st.sidebar.success("Database aggiornato!")
+
+        if os.path.exists("dati.xlsx"):
+            excel = pd.ExcelFile("dati.xlsx")
+            foglio = st.sidebar.selectbox("Seleziona Categoria", excel.sheet_names)
+            df = pd.read_excel("dati.xlsx", sheet_name=foglio, dtype=str)
+        else:
+            st.error("Carica dati.xlsx per procedere")
+            st.stop()
         
+        st.sidebar.markdown("---")
+        g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
+
         nome_cons = utente_loggato["nome"]
         email_cons = utente_loggato["email"]
         tel_cons = utente_loggato["tel"]
@@ -513,8 +521,19 @@ if check_password():
         
         with c2:
             st.subheader("🚘 Veicolo")
-            marca_stampa = st.text_input("Marca", value=st.session_state.get("val_marca_stampa", ""))
-            versione_stampa = st.text_area("Allestimento/Versione", value=st.session_state.get("val_versione_stampa", ""))
+            idx_input_mode = 1 if st.session_state.get("val_input_mode") == "Testo Libero" else 0
+            input_mode = st.radio("Modalità Inserimento", ["Da Listino", "Testo Libero"], horizontal=True, index=idx_input_mode)
+            
+            if input_mode == "Testo Libero":
+                marca_stampa = st.text_input("Marca", value=st.session_state.get("val_marca_stampa", ""))
+                versione_stampa = st.text_area("Allestimento/Versione", value=st.session_state.get("val_versione_stampa", ""))
+            else:
+                marca_sel = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
+                modello_sel = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca_sel]['Vehicle Set description'].unique().tolist()))
+                versione_sel = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca_sel) & (df['Vehicle Set description']==modello_sel)]['Jato Product Description'].unique().tolist()))
+                marca_stampa = marca_sel
+                versione_stampa = versione_sel
+            
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
             foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
@@ -598,7 +617,6 @@ if check_password():
                     for i, p in enumerate(st.session_state["lista_preventivi"]):
                         pdf.add_page()
                         
-                        # 0. NOME CLIENTE AL CENTRO
                         pdf.set_y(20)
                         pdf.set_font(pdf.f_f, "", 12)
                         pdf.set_text_color(200, 200, 200)
@@ -608,14 +626,12 @@ if check_password():
                         pdf.set_text_color(255, 255, 255) 
                         pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
                         
-                        # 1. TITOLO AUTO
                         pdf.set_y(45)
                         pdf.set_font(pdf.f_f, "B", 24)
                         pdf.set_text_color(255, 255, 255)
                         titolo_auto = pulisci_testo(f"{p['marca']} {p['versione']}")
                         pdf.multi_cell(0, 10, titolo_auto, align="C")
                         
-                        # 2. IMMAGINE AUTO
                         y_img = pdf.get_y() + 2
                         if p["foto_bytes"]:
                             f_path = f"tmp_multi_{i}.png" 
@@ -624,11 +640,9 @@ if check_password():
                             f_path = f"foto_vetture/{p['marca'].upper()}.jpg"
                         
                         if os.path.exists(f_path):
-                            try:
-                                pdf.image(f_path, 25, y_img, 160)
+                            try: pdf.image(f_path, 25, y_img, 160)
                             except Exception: pass
                         
-                        # 3. PREZZO GIGANTE IN ORO
                         pdf.set_y(155)
                         pdf.set_font(pdf.f_f, "B", 50) 
                         pdf.set_text_color(201, 188, 65) 
@@ -638,7 +652,6 @@ if check_password():
                         
                         pdf.cell(0, 15, pulisci_testo(f"Euro {canone_str} / mese"), align="C", ln=True)
                         
-                        # 4. BOTTONI DATI
                         pdf.set_y(180)
                         pdf.set_font(pdf.f_f, "B", 11)
                         pdf.set_text_color(255, 255, 255)
@@ -664,7 +677,6 @@ if check_password():
                             pdf.set_xy(x_pos, 180)
                             pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
                         
-                        # 5. SERVIZI INCLUSI 
                         pdf.set_y(202)
                         pdf.set_font(pdf.f_f, "B", 11)
                         pdf.set_text_color(255, 255, 255)
@@ -686,7 +698,6 @@ if check_password():
                         pdf.set_x(10)
                         pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
 
-                        # 5b. OPTIONAL INCLUSI
                         if p.get('opt'):
                             pdf.ln(2)
                             pdf.set_font(pdf.f_f, "B", 10)
@@ -698,7 +709,6 @@ if check_password():
                             pdf.set_x(10)
                             pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
 
-                        # 6. DISCLAIMER E NOTE LEGALI
                         pdf.ln(3)
                         pdf.set_font(pdf.f_f, "I", 8)
                         pdf.set_text_color(180, 180, 180) 
@@ -710,7 +720,6 @@ if check_password():
                         pdf.set_x(10) 
                         pdf.multi_cell(0, 4, pulisci_testo(f"*La presente offerta ha una validità di {g_validita} giorni."), align="C")
 
-                        # 7. NOTE AGGIUNTIVE
                         if p['note']:
                             pdf.ln(2)
                             pdf.set_font(pdf.f_f, "B", 9)
@@ -718,7 +727,6 @@ if check_password():
                             pdf.set_x(10)
                             pdf.multi_cell(0, 5, pulisci_testo(f"Note aggiuntive: {p['note']}"), align="C")
 
-                        # 8. RIFERIMENTI VENDITORE
                         pdf.set_y(255)
                         pdf.set_font(pdf.f_f, "B", 10)
                         pdf.set_text_color(255, 255, 255)
@@ -733,4 +741,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
