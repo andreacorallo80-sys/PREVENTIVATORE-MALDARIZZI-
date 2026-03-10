@@ -21,12 +21,10 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (CON DIAGNOSTICA E API ATTIVA) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (CORRETTA) ---
 def scarica_foto_auto_api(marca, modello):
-    # La chiave API è stata inserita qui sotto:
     api_key = "j8j4go0fx_wdw4h58n5_ydn6f4mk8" 
     
-    # Questo if viene saltato perché la chiave ora c'è
     if api_key == "INSERISCI_QUI_LA_TUA_API_KEY_CARSXE":
         st.warning("⚠️ Diagnostica: Chiave API non inserita nel codice.")
         return None
@@ -47,21 +45,25 @@ def scarica_foto_auto_api(marca, modello):
         if risposta.status_code == 200:
             dati_json = risposta.json()
             
-            # Se l'API restituisce un errore scritto nel json
-            if "error" in dati_json:
-                st.error(f"❌ Errore da CarsXE: {dati_json['error']}")
+            # FIX: Controlliamo che l'errore esista davvero e non sia "false" o vuoto
+            if dati_json.get("error"):
+                st.error(f"❌ Errore da CarsXE: {dati_json.get('error')}")
                 return None
 
             if "images" in dati_json and len(dati_json["images"]) > 0:
-                link_prima_foto = dati_json["images"][0]["link"]
+                # Prende il link della prima foto disponibile
+                link_prima_foto = dati_json["images"][0].get("link")
                 
-                # Scarichiamo l'immagine
-                risposta_foto = requests.get(link_prima_foto, timeout=10)
-                if risposta_foto.status_code == 200:
-                    st.toast("✅ Foto trovata e scaricata con successo da CarsXE!")
-                    return risposta_foto.content 
+                if link_prima_foto:
+                    # Scarichiamo l'immagine dal link
+                    risposta_foto = requests.get(link_prima_foto, timeout=10)
+                    if risposta_foto.status_code == 200:
+                        st.toast("✅ Foto trovata e scaricata con successo da CarsXE!")
+                        return risposta_foto.content 
+                    else:
+                        st.error(f"❌ Impossibile scaricare l'immagine dal link. Codice: {risposta_foto.status_code}")
                 else:
-                    st.error(f"❌ Impossibile scaricare l'immagine dal link. Codice: {risposta_foto.status_code}")
+                    st.error("❌ L'API ha risposto, ma il link dell'immagine è vuoto.")
             else:
                 st.warning(f"⚠️ CarsXE non ha nel database foto per: {marca_clean} {modello_clean}")
         else:
@@ -222,7 +224,7 @@ if check_password():
                     mime="text/csv"
                 )
         else:
-            st.sidebar.warning("Nessun preventivo registrato finora. Fai una stampa per attivare il contatore!")
+            st.sidebar.warning("Nessun preventivo registrato finora.")
         st.sidebar.markdown("---")
 
     opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
@@ -702,9 +704,7 @@ if check_password():
                         
                         y_img = pdf.get_y() + 2
                         
-                        # SISTEMA INSERIMENTO FOTO ANTICRASH
                         if p["foto_bytes"]:
-                            # Usiamo estensione .jpg per maggiore compatibilità con FPDF
                             f_path = f"tmp_multi_{i}.jpg" 
                             with open(f_path, "wb") as f: f.write(p["foto_bytes"])
                             try:
