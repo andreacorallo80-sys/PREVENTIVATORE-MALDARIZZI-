@@ -21,11 +21,12 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (CON DIAGNOSTICA) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (CON DIAGNOSTICA E API ATTIVA) ---
 def scarica_foto_auto_api(marca, modello):
-    # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE:
+    # La chiave API è stata inserita qui sotto:
     api_key = "j8j4go0fx_wdw4h58n5_ydn6f4mk8" 
     
+    # Questo if viene saltato perché la chiave ora c'è
     if api_key == "INSERISCI_QUI_LA_TUA_API_KEY_CARSXE":
         st.warning("⚠️ Diagnostica: Chiave API non inserita nel codice.")
         return None
@@ -579,7 +580,7 @@ if check_password():
                 versione_stampa = versione_sel
             
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
-            foto_m = st.file_uploader("Foto Auto (Opzionale, altrimenti usa API Automatica)", type=["jpg", "png", "jpeg"])
+            foto_m = st.file_uploader("Foto Auto (Opzionale, altrimenti usa API Automatica CarsXE)", type=["jpg", "png", "jpeg"])
 
         st.markdown("---")
         st.subheader("🛡️ Servizi e Penali")
@@ -815,4 +816,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
