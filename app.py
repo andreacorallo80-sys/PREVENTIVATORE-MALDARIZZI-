@@ -22,23 +22,19 @@ def pulisci_testo(testo):
 
 # --- DATABASE VENDITORI COMPLETO (Trascritto dall'immagine) ---
 DATABASE_UTENTI = {
-    "n.pellegrino": {"pw": "Maldarizzi2026", "nome": "NICOLA PELLEGRINO", "email": "n.pellegrino@maldarizzi.com", "tel": "393 015 6757", "ruolo": "interno"},
-    "m.abbatantuono": {"pw": "Maldarizzi2026", "nome": "MICHELE ABBATANTUONO", "email": "m.abbatantuono@maldarizzi.com", "tel": "393 015 6758", "ruolo": "interno"},
-    "g.perna": {"pw": "Maldarizzi2026", "nome": "GIUSEPPE PERNA", "email": "g.perna@maldarizzi.com", "tel": "393 015 6759", "ruolo": "interno"},
-    "a.massa": {"pw": "Maldarizzi2026", "nome": "ANGELA MASSA", "email": "a.massa@maldarizzi.com", "tel": "393 015 6760", "ruolo": "interno"},
-    "m.luisi": {"pw": "Maldarizzi2026", "nome": "MARIA LUISI", "email": "m.luisi@maldarizzi.com", "tel": "393 015 6761", "ruolo": "interno"},
-    "l.diliddo": {"pw": "Maldarizzi2026", "nome": "LUCA DI LIDDO", "email": "l.diliddo@maldarizzi.com", "tel": "393 015 6762", "ruolo": "interno"},
-    "m.liso": {"pw": "Maldarizzi2026", "nome": "MARCO LISO", "email": "m.liso@maldarizzi.com", "tel": "393 015 6763", "ruolo": "interno"},
-    "a.depalo": {"pw": "Maldarizzi2026", "nome": "ALESSANDRO DE PALO", "email": "a.depalo@maldarizzi.com", "tel": "393 015 6764", "ruolo": "interno"},
-    "g.delvecchio": {"pw": "Maldarizzi2026", "nome": "GRAZIA DEL VECCHIO", "email": "g.delvecchio@maldarizzi.com", "tel": "393 015 6765", "ruolo": "interno"},
-    "o.campi": {"pw": "Maldarizzi2026", "nome": "ORAZIO CAMPI", "email": "o.campi@maldarizzi.com", "tel": "393 015 6766", "ruolo": "interno"},
-    "g.morelli": {"pw": "Maldarizzi2026", "nome": "GIUSEPPE MORELLI", "email": "g.morelli@maldarizzi.com", "tel": "393 015 6767", "ruolo": "interno"},
-    "g.debellis": {"pw": "Maldarizzi2026", "nome": "GIOVANNI DE BELLIS", "email": "g.debellis@maldarizzi.com", "tel": "393 015 6768", "ruolo": "interno"},
-    "d.cassone": {"pw": "Maldarizzi2026", "nome": "DOMENICO CASSONE", "email": "d.cassone@maldarizzi.com", "tel": "393 015 6769", "ruolo": "interno"},
-    "v.valeriano": {"pw": "Maldarizzi2026", "nome": "VITO VALERIANO", "email": "v.valeriano@maldarizzi.com", "tel": "393 015 6770", "ruolo": "interno"},
-    "s.piccarreta": {"pw": "Maldarizzi2026", "nome": "SAVERIO PICCARRETA", "email": "s.piccarreta@maldarizzi.com", "tel": "393 015 6771", "ruolo": "interno"},
-    "m.sannicandro": {"pw": "Maldarizzi2026", "nome": "MATTEO SANNICANDRO", "email": "m.sannicandro@maldarizzi.com", "tel": "393 015 6772", "ruolo": "interno"},
-    "admin": {"pw": "cipiacemigliorare", "nome": "ADMIN MALDARIZZI", "email": "admin@maldarizzi.com", "tel": "000 0000000", "ruolo": "interno"}
+    "v.catino": {"pw": "Maldarizzi2026", "nome": "VANESSA CATINO", "email": "v.catino@maldarizzi.com", "tel": "366 449 1633", "ruolo": "interno"},
+    "f.manuto": {"pw": "Maldarizzi2026", "nome": "FRANCESCO MANUTO", "email": "f.manuto@maldarizzi.com", "tel": "342 353 1514", "ruolo": "interno"},
+    "a.corallo": {"pw": "Maldarizzi2026", "nome": "ANDREA CORALLO", "email": "a.corallo@maldarizzi.com ", "tel": "344 343 4826", "ruolo": "interno"},
+    "g.delvecchio": {"pw": "Maldarizzi2026", "nome": "GRAZIA DEL VECCHIO", "email": "g.delvecchio@maldarizzi.com", "tel": "320 764 6334", "ruolo": "interno"},
+    "a.pierro": {"pw": "Maldarizzi2026", "nome": "ANGELA PIERRO", "email": "a.pierro@maldarizzi.com", "tel": "388 928 5242", "ruolo": "interno"},
+    "s.carlucci": {"pw": "Maldarizzi2026", "nome": "SAVERIO CARLUCCI", "email": "saverio.carlucci@maldarizzi.com ", "tel": "337 232 984", "ruolo": "interno"},
+    "l.grieco": {"pw": "Maldarizzi2026", "nome": "LUCA GRIECO", "email": "l.grieco@maldarizzi.com", "tel": "345 252 4566", "ruolo": "interno"},
+    "m.schiralli": {"pw": "Maldarizzi2026", "nome": "MICHELE SCHIRALLI", "email": "m.schiralli@maldarizzi.com ", "tel": "327 6810137", "ruolo": "interno"},
+    "d.catanzaro": {"pw": "Maldarizzi2026", "nome": "DORIANA CATANZARO", "email": "d.catanzaro@maldarizzi.com", "tel": "349 756 8629", "ruolo": "interno"},
+    "v.schiralli": {"pw": "Maldarizzi2026", "nome": "VINCENZO SCHIRALLI", "email": "v.schiralli@maldarizzi.com", "tel": "327 681 0137", "ruolo": "interno"},
+    "a.lozito": {"pw": "Maldarizzi2026", "nome": "ALESSANDRA LOZITO", "email": "a.lozito@maldarizzi.com", "tel": "340 450 7513", "ruolo": "interno"},
+ "p.nolli": {"pw": "Maldarizzi2026", "nome": "PASQUALE NOLLI", "email": "pasquale@omniaprima.com", "tel": "331 399 3389", "ruolo": "interno"},
+    "admin": {"pw": "cipiacemigliorare", "nome": "ADMIN MALDARIZZI", "email": "admin@admin", "tel": "000 0000000", "ruolo": "interno"}
 }
 
 # --- 1. FUNZIONE LOGIN ---
@@ -741,3 +737,4 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
