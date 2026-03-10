@@ -20,6 +20,27 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
+# --- NUOVA FUNZIONE: REGISTRAZIONE STATISTICHE ---
+def registra_statistica(consulente, cliente, marca, modello, canone, anticipo, durata, km, origine):
+    file_path = "statistiche_preventivi.csv"
+    data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    nuovo_dato = pd.DataFrame([{
+        "Data_Ora": data_ora,
+        "Consulente": consulente,
+        "Cliente": cliente,
+        "Marca": marca,
+        "Modello": modello,
+        "Canone_Mese": canone,
+        "Anticipo": anticipo,
+        "Durata_Mesi": durata,
+        "Km_Anno": km,
+        "Sorgente_Dati": origine
+    }])
+    if os.path.exists(file_path):
+        nuovo_dato.to_csv(file_path, mode='a', header=False, index=False)
+    else:
+        nuovo_dato.to_csv(file_path, mode='w', header=True, index=False)
+
 # --- DATABASE VENDITORI COMPLETO E CORRETTO ---
 DATABASE_UTENTI = {
     "v.catino": {"pw": "Maldarizzi2026", "nome": "VANESSA CATINO", "email": "v.catino@maldarizzi.com", "tel": "366 449 1633", "ruolo": "interno"},
@@ -37,7 +58,7 @@ DATABASE_UTENTI = {
     "admin": {"pw": "cipiacemigliorare", "nome": "ADMIN MALDARIZZI", "email": "admin@admin.com", "tel": "000 0000000", "ruolo": "admin"}
 }
 
-# --- 1. FUNZIONE LOGIN ---
+# --- 1. FUNZIONE LOGIN (Sistema Anti-Crash) ---
 def check_password():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
@@ -53,17 +74,17 @@ def check_password():
             user = st.text_input("Username (es. a.corallo)").lower().strip()
             password = st.text_input("Password", type="password")
             if st.button("Accedi"):
-                if user in DATABASE_UTENTI and password == DATABASE_UTENTI[user]["pw"]:
+                utente = DATABASE_UTENTI.get(user)
+                if utente and password == utente.get("pw"):
                     st.session_state["authenticated"] = True
-                    st.session_state["current_user"] = DATABASE_UTENTI[user]
+                    st.session_state["current_user"] = utente
                     st.rerun()
                 else:
-                    st.error("Credenziali errate")
+                    st.error("Credenziali errate o utente inesistente")
         return False
     return True
 
 # --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
-# Sistema di navigazione blindato per evitare KeyError
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
@@ -82,6 +103,7 @@ if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
 if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
+if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
 # --- 2. CLASSE PDF ---
 class MaldarizziPDF(FPDF):
@@ -134,14 +156,31 @@ if check_password():
     st.sidebar.markdown(f"🏷️ Ruolo: *{utente_loggato['ruolo'].upper()}*")
     st.sidebar.markdown("---")
     
-    # Costruzione Logica del Menu per navigazione sicura
+    # PANNELLO DIREZIONE (STATISTICHE - VISIBILE SOLO AD ADMIN)
+    if utente_loggato["ruolo"] == "admin":
+        st.sidebar.markdown("### 📊 Pannello Direzione")
+        if os.path.exists("statistiche_preventivi.csv"):
+            df_stats = pd.read_csv("statistiche_preventivi.csv")
+            totale_prev = len(df_stats)
+            st.sidebar.success(f"Totale Preventivi Generati: **{totale_prev}**")
+            
+            with open("statistiche_preventivi.csv", "rb") as f:
+                st.sidebar.download_button(
+                    label="📥 Scarica Excel Statistiche",
+                    data=f,
+                    file_name="Statistiche_Maldarizzi.csv",
+                    mime="text/csv"
+                )
+        else:
+            st.sidebar.warning("Nessun preventivo registrato finora. Fai una stampa per attivare il contatore!")
+        st.sidebar.markdown("---")
+
     opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
     try: idx_menu = opzioni_menu.index(st.session_state["pagina_attiva"])
     except: idx_menu = 0
 
     menu_scelta = st.sidebar.radio("📌 MENU PRINCIPALE", opzioni_menu, index=idx_menu)
     
-    # Se l'utente clicca un'opzione diversa dal menu laterale, cambiamo la pagina
     if menu_scelta != st.session_state["pagina_attiva"]:
         st.session_state["pagina_attiva"] = menu_scelta
         st.rerun()
@@ -197,7 +236,15 @@ if check_password():
                     offerta_tipo = str(row.get('OFFERTA', '')).strip()
                     player = str(row.get('PLAYER', '')).strip().upper()
                     commissioni = str(row.get('COMMISSIONI', '')).strip()
-                    link_offerta = str(row.get('link offerta', '')).strip()
+                    
+                    # LOGICA INTELLIGENTE DEL LINK
+                    link_raw = str(row.get('link offerta', '')).strip()
+                    link_valido = ""
+                    if link_raw and link_raw.lower() != "nan" and len(link_raw) > 5:
+                        if link_raw.startswith("http"):
+                            link_valido = link_raw
+                        elif link_raw.startswith("www"):
+                            link_valido = "https://" + link_raw
                     
                     try: canone = int(float(str(row.get('CANONE', 0)).replace(',','.')))
                     except: canone = 0
@@ -216,7 +263,7 @@ if check_password():
                     offerte_filtrate.append({
                         "marca": marca, "modello": modello, "canone": canone, 
                         "anticipo": anticipo, "durata": mesi, "km": km,
-                        "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_offerta
+                        "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
                 if not offerte_filtrate:
@@ -225,11 +272,10 @@ if check_password():
                     colonne_griglia = st.columns(3)
                     for idx, auto in enumerate(offerte_filtrate):
                         with colonne_griglia[idx % 3]:
-                            # GESTIONE SICURA DEL LINK WEB
-                            if auto["link"] and str(auto["link"]).startswith("http"):
+                            if auto["link"]:
                                 link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41; text-decoration: none; font-size: 13px;">🔗 Apri pagina Offerta Web</a>'
                             else:
-                                link_html = '<span style="color: #888; font-size: 12px; font-style: italic;">Nessun link web valido inserito nel database</span>'
+                                link_html = '<span style="color: #888; font-size: 12px; font-style: italic;">Nessun link web inserito</span>'
                             
                             st.markdown(f"""
                             <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-bottom: 15px;">
@@ -250,7 +296,6 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # IL BOTTONE MAGICO CHE CAMBIA PAGINA IN MODO SICURO
                             if st.button(f"➡️ Usa Promo {auto['marca']}", key=f"btn_promo_{idx}"):
                                 st.session_state["val_marca_stampa"] = auto['marca']
                                 st.session_state["val_versione_stampa"] = auto['modello']
@@ -259,8 +304,8 @@ if check_password():
                                 st.session_state["val_durata"] = auto['durata']
                                 st.session_state["val_km"] = auto['km']
                                 st.session_state["val_input_mode"] = "Testo Libero"
+                                st.session_state["origine_preventivo"] = "Vetrina Promo" 
                                 
-                                # Aggiorna la variabile sicura per il teletrasporto!
                                 st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
                                 st.rerun()
 
@@ -293,6 +338,7 @@ if check_password():
                 testo_upper = testo_flat.upper()
                 st.session_state["debug_text"] = testo_flat
                 st.session_state["val_input_mode"] = "Testo Libero"
+                st.session_state["origine_preventivo"] = "Importazione da PDF"
                 
                 if "IVA INCLUSA" in testo_upper or "I.V.A. INCLUSA" in testo_upper or "CODICE FISCALE" in testo_upper or "C.F." in testo_upper or "PRIVATO" in testo_upper:
                     st.session_state["val_tipo_cliente"] = "Privato"
@@ -506,6 +552,11 @@ if check_password():
             kasko_idx = kasko_options.index(st.session_state.get("val_p_kasko", "500 Euro")) if st.session_state.get("val_p_kasko", "500 Euro") in kasko_options else 2
             p_kasko = st.selectbox("Penale Danni/Kasko", kasko_options, index=kasko_idx)
             infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
+            
+            usa_vett_sost = st.checkbox("Vettura Sostitutiva?", value=False)
+            vett_sost_cat = None
+            if usa_vett_sost:
+                vett_sost_cat = st.selectbox("Categoria Vettura Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY", "MONOVOLUME", "PARI CATEGORIA"])
         
         with s3:
             usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
@@ -542,8 +593,10 @@ if check_password():
                 "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
                 "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
                 "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
+                "vett_sost": pulisci_testo(vett_sost_cat) if usa_vett_sost else None,
                 "canone": canone, "anticipo": anticipo, "durata": durata, "km": km,
-                "iva_text": iva_text 
+                "iva_text": iva_text,
+                "origine_dati": st.session_state.get("origine_preventivo", "Manuale") 
             }
             st.session_state["lista_preventivi"].append(auto_aggiunta)
             st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
@@ -568,6 +621,19 @@ if check_password():
                     pdf = MaldarizziPDF()
                     
                     for i, p in enumerate(st.session_state["lista_preventivi"]):
+                        # SALVATAGGIO STATISTICHE 
+                        registra_statistica(
+                            consulente=nome_cons.upper(),
+                            cliente=p['cliente'],
+                            marca=p['marca'],
+                            modello=p['versione'],
+                            canone=p['canone'],
+                            anticipo=p['anticipo'],
+                            durata=p['durata'],
+                            km=p['km'],
+                            origine=p['origine_dati']
+                        )
+
                         pdf.add_page()
                         
                         pdf.set_y(20)
@@ -644,8 +710,9 @@ if check_password():
                             "Manutenzione Ordinaria/Straordinaria",
                             "Assistenza Stradale H24"
                         ]
-                        if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
-                        if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
+                        if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
+                        if p.get('infort'): serv_list.append("Infortunio Conducente (PAI)")
+                        if p.get('vett_sost'): serv_list.append(f"Vettura Sostitutiva ({p['vett_sost']})")
                         
                         testo_servizi = " | ".join(serv_list)
                         pdf.set_x(10)
@@ -694,5 +761,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
