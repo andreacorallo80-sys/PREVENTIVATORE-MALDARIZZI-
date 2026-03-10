@@ -20,8 +20,6 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- DATABASE VENDITORI COMPLETO ---
-DATABASE_UTENTI = {
 # --- DATABASE VENDITORI COMPLETO (Trascritto dall'immagine) ---
 DATABASE_UTENTI = {
     "v.catino": {"pw": "Maldarizzi2026", "nome": "VANESSA CATINO", "email": v.catino@maldarizzi.com, "tel": "366 449 1633", "ruolo": "interno"},
@@ -685,4 +683,5 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
