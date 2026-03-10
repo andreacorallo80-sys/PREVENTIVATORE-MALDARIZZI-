@@ -50,7 +50,7 @@ def check_password():
             if os.path.exists("logo.png"): 
                 st.image("logo.png", width=200)
             st.subheader("Portale Noleggio Maldarizzi")
-            user = st.text_input("Username (es. a.corallo)").lower().strip()
+            user = st.text_input("Username (es. v.catino)").lower().strip()
             password = st.text_input("Password", type="password")
             if st.button("Accedi"):
                 if user in DATABASE_UTENTI and password == DATABASE_UTENTI[user]["pw"]:
@@ -63,7 +63,6 @@ def check_password():
     return True
 
 # --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
-# Sistema di navigazione blindato per evitare KeyError
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
@@ -134,14 +133,12 @@ if check_password():
     st.sidebar.markdown(f"🏷️ Ruolo: *{utente_loggato['ruolo'].upper()}*")
     st.sidebar.markdown("---")
     
-    # Costruzione Logica del Menu per navigazione sicura
     opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
     try: idx_menu = opzioni_menu.index(st.session_state["pagina_attiva"])
     except: idx_menu = 0
 
     menu_scelta = st.sidebar.radio("📌 MENU PRINCIPALE", opzioni_menu, index=idx_menu)
     
-    # Se l'utente clicca un'opzione diversa dal menu laterale, cambiamo la pagina
     if menu_scelta != st.session_state["pagina_attiva"]:
         st.session_state["pagina_attiva"] = menu_scelta
         st.rerun()
@@ -225,7 +222,6 @@ if check_password():
                     colonne_griglia = st.columns(3)
                     for idx, auto in enumerate(offerte_filtrate):
                         with colonne_griglia[idx % 3]:
-                            # GESTIONE SICURA DEL LINK WEB
                             if auto["link"] and str(auto["link"]).startswith("http"):
                                 link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41; text-decoration: none; font-size: 13px;">🔗 Apri pagina Offerta Web</a>'
                             else:
@@ -250,7 +246,6 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # IL BOTTONE MAGICO CHE CAMBIA PAGINA IN MODO SICURO
                             if st.button(f"➡️ Usa Promo {auto['marca']}", key=f"btn_promo_{idx}"):
                                 st.session_state["val_marca_stampa"] = auto['marca']
                                 st.session_state["val_versione_stampa"] = auto['modello']
@@ -260,7 +255,6 @@ if check_password():
                                 st.session_state["val_km"] = auto['km']
                                 st.session_state["val_input_mode"] = "Testo Libero"
                                 
-                                # Aggiorna la variabile sicura per il teletrasporto!
                                 st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
                                 st.rerun()
 
@@ -506,6 +500,12 @@ if check_password():
             kasko_idx = kasko_options.index(st.session_state.get("val_p_kasko", "500 Euro")) if st.session_state.get("val_p_kasko", "500 Euro") in kasko_options else 2
             p_kasko = st.selectbox("Penale Danni/Kasko", kasko_options, index=kasko_idx)
             infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
+            
+            # --- VETTURA SOSTITUTIVA ---
+            usa_vett_sost = st.checkbox("Vettura Sostitutiva?", value=False)
+            vett_sost_cat = None
+            if usa_vett_sost:
+                vett_sost_cat = st.selectbox("Categoria Vettura Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY", "MONOVOLUME", "PARI CATEGORIA"])
         
         with s3:
             usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
@@ -542,6 +542,7 @@ if check_password():
                 "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
                 "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
                 "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
+                "vett_sost": pulisci_testo(vett_sost_cat) if usa_vett_sost else None, # NUOVO CAMPO
                 "canone": canone, "anticipo": anticipo, "durata": durata, "km": km,
                 "iva_text": iva_text 
             }
@@ -644,8 +645,10 @@ if check_password():
                             "Manutenzione Ordinaria/Straordinaria",
                             "Assistenza Stradale H24"
                         ]
-                        if p['g_num']: serv_list.append(f"Gomme: {p['g_num']}")
-                        if p['infort']: serv_list.append("Infortunio Conducente (PAI)")
+                        if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
+                        if p.get('infort'): serv_list.append("Infortunio Conducente (PAI)")
+                        # AGGIUNTA DELLA VETTURA SOSTITUTIVA NEL PDF
+                        if p.get('vett_sost'): serv_list.append(f"Vettura Sostitutiva ({p['vett_sost']})")
                         
                         testo_servizi = " | ".join(serv_list)
                         pdf.set_x(10)
