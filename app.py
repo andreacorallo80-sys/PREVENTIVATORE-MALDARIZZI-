@@ -21,56 +21,61 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (CORRETTA) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (INTELLIGENTE A 3 TENTATIVI) ---
 def scarica_foto_auto_api(marca, modello):
     api_key = "j8j4go0fx_wdw4h58n5_ydn6f4mk8" 
     
-    if api_key == "INSERISCI_QUI_LA_TUA_API_KEY_CARSXE":
-        st.warning("⚠️ Diagnostica: Chiave API non inserita nel codice.")
-        return None
-        
     marca_clean = str(marca).strip()
-    modello_clean = str(modello).strip().split()[0] if modello else ""
+    
+    # Separiamo il nome del modello dall'allestimento (trim)
+    parti_modello = str(modello).strip().split()
+    modello_clean = parti_modello[0] if parti_modello else ""
+    trim_clean = " ".join(parti_modello[1:]) if len(parti_modello) > 1 else ""
+    
+    # Calcoliamo l'anno in corso (le auto in leasing sono tipicamente nuove)
+    anno_corrente = datetime.now().year
     
     url_api = "https://api.carsxe.com/images"
-    parametri = {
-        "key": api_key,
-        "make": marca_clean,
-        "model": modello_clean
+    
+    # Prepariamo i 3 livelli di precisione per la ricerca
+    parametri_1 = { # Massima precisione
+        "key": api_key, "make": marca_clean, "model": modello_clean,
+        "year": anno_corrente, "photoType": "exterior"
+    }
+    if trim_clean:
+        parametri_1["trim"] = trim_clean
+        
+    parametri_2 = { # Media precisione (ignora l'allestimento se è troppo strano)
+        "key": api_key, "make": marca_clean, "model": modello_clean,
+        "year": anno_corrente, "photoType": "exterior"
     }
     
-    try:
-        risposta = requests.get(url_api, params=parametri, timeout=10)
-        
-        if risposta.status_code == 200:
-            dati_json = risposta.json()
-            
-            # FIX: Controlliamo che l'errore esista davvero e non sia "false" o vuoto
-            if dati_json.get("error"):
-                st.error(f"❌ Errore da CarsXE: {dati_json.get('error')}")
-                return None
+    parametri_3 = { # Bassa precisione (prende la prima che trova se le altre falliscono)
+        "key": api_key, "make": marca_clean, "model": modello_clean
+    }
+    
+    # Se c'è un trim proviamo tutti e 3, altrimenti solo 2 e 3
+    tentativi = [parametri_1, parametri_2, parametri_3] if trim_clean else [parametri_2, parametri_3]
 
-            if "images" in dati_json and len(dati_json["images"]) > 0:
-                # Prende il link della prima foto disponibile
-                link_prima_foto = dati_json["images"][0].get("link")
+    for params in tentativi:
+        try:
+            risposta = requests.get(url_api, params=params, timeout=10)
+            if risposta.status_code == 200:
+                dati_json = risposta.json()
                 
-                if link_prima_foto:
-                    # Scarichiamo l'immagine dal link
-                    risposta_foto = requests.get(link_prima_foto, timeout=10)
-                    if risposta_foto.status_code == 200:
-                        st.toast("✅ Foto trovata e scaricata con successo da CarsXE!")
-                        return risposta_foto.content 
-                    else:
-                        st.error(f"❌ Impossibile scaricare l'immagine dal link. Codice: {risposta_foto.status_code}")
-                else:
-                    st.error("❌ L'API ha risposto, ma il link dell'immagine è vuoto.")
-            else:
-                st.warning(f"⚠️ CarsXE non ha nel database foto per: {marca_clean} {modello_clean}")
-        else:
-            st.error(f"❌ Errore Comunicazione API: {risposta.status_code} - {risposta.text}")
-    except Exception as e:
-        st.error(f"❌ Errore di rete/connessione a CarsXE: {e}")
-        
+                # Se NON c'è errore e ci sono immagini nella lista
+                if not dati_json.get("error") and "images" in dati_json and len(dati_json["images"]) > 0:
+                    link_prima_foto = dati_json["images"][0].get("link")
+                    
+                    if link_prima_foto:
+                        risposta_foto = requests.get(link_prima_foto, timeout=10)
+                        if risposta_foto.status_code == 200:
+                            st.toast("✅ Foto esterna scaricata con successo da CarsXE!")
+                            return risposta_foto.content 
+        except Exception:
+            continue # Se un tentativo fallisce (es. errore di rete), passa al successivo
+            
+    st.warning(f"⚠️ CarsXE non ha trovato foto esterne adatte per: {marca_clean} {modello_clean}")
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -224,7 +229,7 @@ if check_password():
                     mime="text/csv"
                 )
         else:
-            st.sidebar.warning("Nessun preventivo registrato finora.")
+            st.sidebar.warning("Nessun preventivo registrato finora. Fai una stampa per attivare il contatore!")
         st.sidebar.markdown("---")
 
     opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
