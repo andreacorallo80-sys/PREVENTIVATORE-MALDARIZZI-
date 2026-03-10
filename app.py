@@ -37,7 +37,8 @@ def check_password():
         st.markdown("<style>.stApp { background-color: #000000; }</style>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            if os.path.exists("logo.png"): st.image("logo.png", width=200)
+            if os.path.exists("logo.png"): 
+                st.image("logo.png", width=200)
             st.subheader("Portale Noleggio Maldarizzi")
             user = st.text_input("Username (es. grazia)").lower().strip()
             password = st.text_input("Password", type="password")
@@ -113,13 +114,15 @@ except: pass
 if check_password():
     utente_loggato = st.session_state["current_user"]
     
-    # --- MENU DI NAVIGAZIONE LATERALE ---
-    st.sidebar.image("logo.png", width=180) if os.path.exists("logo.png") else None
+    # --- MENU DI NAVIGAZIONE LATERALE (Fixato il testo strano) ---
+    if os.path.exists("logo.png"):
+        st.sidebar.image("logo.png", width=180)
+        
     st.sidebar.markdown(f"👤 Benvenuto, **{utente_loggato['nome']}**")
     st.sidebar.markdown(f"🏷️ Ruolo: *{utente_loggato['ruolo'].upper()}*")
     st.sidebar.markdown("---")
     
-    menu_scelta = st.sidebar.radio("📌 MENU PRINCIPALE", ["🎯 Preventivatore Strumentale", "🔥 Offerte del Mese"])
+    menu_scelta = st.sidebar.radio("📌 MENU PRINCIPALE", ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"])
     
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 Esci"):
@@ -127,57 +130,104 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: DASHBOARD PROMO
+    # SEZIONE 1: DASHBOARD PROMO (CON LETTURA DA EXCEL)
     # ==========================================
     if menu_scelta == "🔥 Offerte del Mese":
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le nostre migliori offerte disponibili e scarica la locandina.")
+        st.markdown("Sfoglia le nostre migliori offerte disponibili in base al file di caricamento mensile.")
         
-        c_search, c_alimen = st.columns([2, 1])
-        with c_search:
-            ricerca = st.text_input("🔍 Cerca per marca o modello...")
-        with c_alimen:
-            filtro_alimen = st.selectbox("⚡ Alimentazione", ["Tutte", "Ibrida", "Elettrica", "Diesel", "Benzina"])
-        st.markdown("---")
-        
-        # DATI FINTI DIMOSTRATIVI (In futuro li prenderemo da Excel)
-        offerte_demo = [
-            {"marca": "MASERATI", "modello": "Grecale MHEV Q4", "canone": 933, "anticipo": 5000, "durata": 48, "km": 60000, "visibilita": "tutti"},
-            {"marca": "LAND ROVER", "modello": "Defender D200", "canone": 1088, "anticipo": 0, "durata": 48, "km": 80000, "visibilita": "solo interni"},
-            {"marca": "PEUGEOT", "modello": "208 Allure Hybrid", "canone": 299, "anticipo": 2000, "durata": 36, "km": 30000, "visibilita": "tutti"},
-            {"marca": "ALFA ROMEO", "modello": "Tonale Plug-in Q4", "canone": 450, "anticipo": 3000, "durata": 36, "km": 45000, "visibilita": "solo interni"}
-        ]
-        
-        offerte_filtrate = []
-        for off in offerte_demo:
-            if utente_loggato['ruolo'] == 'esterno' and off['visibilita'] == 'solo interni': continue
-            offerte_filtrate.append(off)
-            
-        colonne_griglia = st.columns(3)
-        for idx, auto in enumerate(offerte_filtrate):
-            with colonne_griglia[idx % 3]:
-                st.markdown(f"""
-                <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 0; color: #FFF;">{auto['marca']}</h3>
-                    <h5 style="margin-top: 0; color: #AAA;">{auto['modello']}</h5>
-                    <h1 style="color: #C9BC41;">€ {auto['canone']}<span style="font-size: 14px; color: #888;"> /mese</span></h1>
-                    <p style="color: #DDD; font-size: 14px;">
-                        ⏳ {auto['durata']} mesi | 🛣️ {auto['km']} Km totali<br>
-                        💰 Anticipo: € {auto['anticipo']}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                if st.button(f"📄 Scarica Offerta {auto['marca']}", key=f"btn_{idx}"):
-                    st.success(f"Generazione PDF in costruzione per {auto['marca']}...")
+        # UPLOAD DEL FILE EXCEL PROMO
+        st.sidebar.header("📥 Gestione Database Promo")
+        file_promo = st.sidebar.file_uploader("Carica il file Excel delle promozioni", type=["xlsx", "csv"])
+        if file_promo:
+            with open("promo_mese.xlsx", "wb") as f: 
+                f.write(file_promo.getbuffer())
+            st.sidebar.success("✅ Database Promozioni aggiornato!")
+
+        # SE IL FILE ESISTE, CREIAMO LA VETRINA
+        if os.path.exists("promo_mese.xlsx"):
+            try:
+                # Leggiamo il file Excel
+                df_promo = pd.read_excel("promo_mese.xlsx")
+                # Pulizia colonne (elimina gli spazi vuoti accidentali come "MARCA ")
+                df_promo.columns = df_promo.columns.str.strip()
+                df_promo = df_promo.fillna("") # Togliamo i fastidiosi "NaN"
+                
+                # --- Filtri Dinamici ---
+                c_search, c_alimen = st.columns([2, 1])
+                with c_search:
+                    ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
+                with c_alimen:
+                    # Crea la lista delle alimentazioni leggendole dal tuo file
+                    lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
+                    filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
+                
+                st.markdown("---")
+                
+                # --- Creazione Vetrina ---
+                offerte_filtrate = []
+                for _, row in df_promo.iterrows():
+                    marca = str(row.get('MARCA', '')).strip().upper()
+                    modello = str(row.get('MODELLO', '')).strip()
+                    alimen = str(row.get('ALIMENTAZIONE', '')).strip().upper()
+                    
+                    # Convertiamo in numero gestendo i casi strani
+                    try: canone = int(float(str(row.get('CANONE', 0)).replace(',','.')))
+                    except: canone = 0
+                    try: anticipo = int(float(str(row.get('ANTICIPO', 0)).replace(',','.')))
+                    except: anticipo = 0
+                    try: mesi = int(row.get('MESI', 0))
+                    except: mesi = 0
+                    try: km = int(row.get('KM TOTALI', 0))
+                    except: km = 0
+
+                    # Applichiamo il filtro di Ricerca
+                    if ricerca and ricerca not in marca and ricerca not in modello.upper():
+                        continue
+                    
+                    # Applichiamo il filtro di Alimentazione
+                    if filtro_alimen != "Tutte" and alimen != filtro_alimen:
+                        continue
+                        
+                    offerte_filtrate.append({
+                        "marca": marca, "modello": modello, "canone": canone, 
+                        "anticipo": anticipo, "durata": mesi, "km": km
+                    })
+                
+                # Visualizzazione in griglia a 3 colonne
+                if not offerte_filtrate:
+                    st.warning("Nessuna offerta trovata con questi parametri.")
+                else:
+                    colonne_griglia = st.columns(3)
+                    for idx, auto in enumerate(offerte_filtrate):
+                        with colonne_griglia[idx % 3]:
+                            st.markdown(f"""
+                            <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-bottom: 20px;">
+                                <h3 style="margin-bottom: 0; color: #FFF;">{auto['marca']}</h3>
+                                <h5 style="margin-top: 0; color: #AAA;">{auto['modello']}</h5>
+                                <h1 style="color: #C9BC41;">€ {auto['canone']}<span style="font-size: 14px; color: #888;"> /mese</span></h1>
+                                <p style="color: #DDD; font-size: 14px;">
+                                    ⏳ {auto['durata']} mesi | 🛣️ {auto['km']} Km totali<br>
+                                    💰 Anticipo: € {auto['anticipo']}
+                                </p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Tasto temporaneo (Al momento finto, lo collegheremo al PDF)
+                            if st.button(f"📄 Crea Offerta {auto['marca']}", key=f"btn_promo_{idx}"):
+                                st.success(f"Funzione di generazione PDF rapido per {auto['marca']} in arrivo nel prossimo step!")
+            except Exception as e:
+                st.error(f"Si è verificato un errore nella lettura del file Excel: {str(e)}")
+        else:
+            st.info("👈 Carica il file Excel delle promozioni dal menù laterale per generare la vetrina.")
 
 
     # ==========================================
-    # SEZIONE 2: PREVENTIVATORE COMPLETO
+    # SEZIONE 2: PREVENTIVATORE STRUMENTALE (IL VECCHIO CODICE)
     # ==========================================
     elif menu_scelta == "🎯 Preventivatore Strumentale":
         st.title("🎯 Preventivatore Strumentale")
         
-        # SPOSTIAMO I CARICAMENTI NELLA SIDEBAR SOLO QUANDO SIAMO IN QUESTA SCHERMATA
         st.sidebar.header("📥 Importa PDF Portale")
         pdf_portale = st.sidebar.file_uploader("Carica PDF (Arval, Leasys, Ayvens)", type=["pdf"])
         
@@ -342,24 +392,8 @@ if check_password():
                 st.write(st.session_state["debug_text"])
 
         st.sidebar.markdown("---")
-        st.sidebar.header("📁 Database Listino")
-        uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
-        if uploaded_excel:
-            with open("dati.xlsx", "wb") as f: f.write(uploaded_excel.getbuffer())
-            st.sidebar.success("Database aggiornato!")
-
-        if os.path.exists("dati.xlsx"):
-            excel = pd.ExcelFile("dati.xlsx")
-            foglio = st.sidebar.selectbox("Seleziona Categoria", excel.sheet_names)
-            df = pd.read_excel("dati.xlsx", sheet_name=foglio, dtype=str)
-        else:
-            st.error("Carica dati.xlsx per procedere")
-            st.stop()
-        
-        st.sidebar.markdown("---")
         g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
-
-        # GESTIONE DEI CAMPI DEL VENDITORE IN BASE AL LOGIN
+        
         nome_cons = utente_loggato["nome"]
         email_cons = utente_loggato["email"]
         tel_cons = utente_loggato["tel"]
@@ -376,19 +410,8 @@ if check_password():
         
         with c2:
             st.subheader("🚘 Veicolo")
-            idx_input_mode = 1 if st.session_state.get("val_input_mode") == "Testo Libero" else 0
-            input_mode = st.radio("Modalità Inserimento", ["Da Listino", "Testo Libero"], horizontal=True, index=idx_input_mode)
-            
-            if input_mode == "Testo Libero":
-                marca_stampa = st.text_input("Marca", value=st.session_state.get("val_marca_stampa", ""))
-                versione_stampa = st.text_area("Allestimento/Versione", value=st.session_state.get("val_versione_stampa", ""))
-            else:
-                marca_sel = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
-                modello_sel = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca_sel]['Vehicle Set description'].unique().tolist()))
-                versione_sel = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca_sel) & (df['Vehicle Set description']==modello_sel)]['Jato Product Description'].unique().tolist()))
-                marca_stampa = marca_sel
-                versione_stampa = versione_sel
-            
+            marca_stampa = st.text_input("Marca", value=st.session_state.get("val_marca_stampa", ""))
+            versione_stampa = st.text_area("Allestimento/Versione", value=st.session_state.get("val_versione_stampa", ""))
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
             foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
@@ -502,7 +525,7 @@ if check_password():
                                 pdf.image(f_path, 25, y_img, 160)
                             except Exception: pass
                         
-                        # 3. PREZZO GIGANTE IN ORO MALDARIZZI
+                        # 3. PREZZO GIGANTE IN ORO
                         pdf.set_y(155)
                         pdf.set_font(pdf.f_f, "B", 50) 
                         pdf.set_text_color(201, 188, 65) 
@@ -579,10 +602,8 @@ if check_password():
                         
                         pdf.set_x(10) 
                         pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale."), align="C")
-                        
                         pdf.set_x(10) 
                         pdf.multi_cell(0, 4, pulisci_testo("*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019)."), align="C")
-
                         pdf.set_x(10) 
                         pdf.multi_cell(0, 4, pulisci_testo(f"*La presente offerta ha una validità di {g_validita} giorni."), align="C")
 
