@@ -4,6 +4,7 @@ import os
 import re
 import pypdf
 import io
+import requests # LIBRERIA PER LE API
 from fpdf import FPDF
 from datetime import datetime
 import locale
@@ -20,7 +21,43 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: REGISTRAZIONE STATISTICHE ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE ---
+def scarica_foto_auto_api(marca, modello):
+    # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE:
+    api_key = "INSERISCI_QUI_LA_TUA_API_KEY_CARSXE" 
+    
+    if api_key == "j8j4go0fx_wdw4h58n5_ydn6f4mk8":
+        return None # Esce senza errori se non hai ancora messo la chiave
+        
+    marca_clean = str(marca).strip()
+    # Prendiamo la prima parola del modello per una ricerca più sicura su CarsXE
+    modello_clean = str(modello).strip().split()[0] if modello else ""
+    
+    # Endpoint ufficiale di CarsXE per la ricerca immagini
+    url_api = f"https://api.carsxe.com/images?key={api_key}&make={marca_clean}&model={modello_clean}"
+    
+    try:
+        # 1. Chiediamo a CarsXE le foto di questa auto
+        risposta = requests.get(url_api, timeout=10)
+        
+        if risposta.status_code == 200:
+            dati_json = risposta.json()
+            
+            # 2. Controlliamo se ci ha restituito un elenco di immagini
+            if "images" in dati_json and len(dati_json["images"]) > 0:
+                # Prendiamo il link della prima immagine disponibile
+                link_prima_foto = dati_json["images"][0]["link"]
+                
+                # 3. Scarichiamo l'immagine vera e propria da quel link
+                risposta_foto = requests.get(link_prima_foto, timeout=10)
+                if risposta_foto.status_code == 200:
+                    return risposta_foto.content # Restituisce i byte per il PDF
+    except Exception as e:
+        return None # In caso di problemi di rete, continua senza foto
+        
+    return None
+
+# --- REGISTRAZIONE STATISTICHE ---
 def registra_statistica(consulente, cliente, marca, modello, canone, anticipo, durata, km, origine):
     file_path = "statistiche_preventivi.csv"
     data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -237,7 +274,6 @@ if check_password():
                     player = str(row.get('PLAYER', '')).strip().upper()
                     commissioni = str(row.get('COMMISSIONI', '')).strip()
                     
-                    # LOGICA INTELLIGENTE DEL LINK
                     link_raw = str(row.get('link offerta', '')).strip()
                     link_valido = ""
                     if link_raw and link_raw.lower() != "nan" and len(link_raw) > 5:
@@ -532,7 +568,7 @@ if check_password():
                 versione_stampa = versione_sel
             
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
-            foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
+            foto_m = st.file_uploader("Foto Auto (Opzionale, altrimenti usa API Automatica CarsXE)", type=["jpg", "png", "jpeg"])
 
         st.markdown("---")
         st.subheader("🛡️ Servizi e Penali")
@@ -585,7 +621,16 @@ if check_password():
 
         st.markdown("---")
         if st.button("➕ AGGIUNGI AL DOCUMENTO"):
+            
+            # LOGICA FOTO MISTA (Manuale o API Automatica CarsXE)
             foto_bytes = foto_m.getvalue() if foto_m else None
+            if not foto_bytes:
+                # Tenta lo scaricamento automatico
+                with st.spinner('Ricerca foto vettura in corso su CarsXE...'):
+                    foto_bytes_api = scarica_foto_auto_api(marca_stampa, versione_stampa)
+                    if foto_bytes_api:
+                        foto_bytes = foto_bytes_api
+            
             auto_aggiunta = {
                 "cliente": pulisci_testo(nome_cliente), "consegna": pulisci_testo(consegna), 
                 "t_veicolo": pulisci_testo(t_veicolo), "note": pulisci_testo(note_p),
