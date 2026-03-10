@@ -213,9 +213,112 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Tasto temporaneo (Al momento finto, lo collegheremo al PDF)
-                            if st.button(f"📄 Crea Offerta {auto['marca']}", key=f"btn_promo_{idx}"):
-                                st.success(f"Funzione di generazione PDF rapido per {auto['marca']} in arrivo nel prossimo step!")
+                           # --- SISTEMA DI GENERAZIONE PDF REALE PER LA VETRINA ---
+                            if st.button(f"📄 Prepara Offerta {auto['marca']}", key=f"btn_promo_{idx}"):
+                                pdf = MaldarizziPDF()
+                                pdf.add_page()
+                                
+                                # 0. INTESTAZIONE
+                                pdf.set_y(20)
+                                pdf.set_font(pdf.f_f, "", 12)
+                                pdf.set_text_color(200, 200, 200)
+                                pdf.cell(0, 5, "Offerta Promozionale:", align="C", ln=True)
+                                pdf.set_font(pdf.f_f, "B", 16)
+                                pdf.set_text_color(255, 255, 255) 
+                                pdf.cell(0, 7, "GENTILE CLIENTE", align="C", ln=True)
+                                
+                                # 1. TITOLO AUTO
+                                pdf.set_y(45)
+                                pdf.set_font(pdf.f_f, "B", 24)
+                                pdf.set_text_color(255, 255, 255)
+                                titolo_auto = pulisci_testo(f"{auto['marca']} {auto['modello']}")
+                                pdf.multi_cell(0, 10, titolo_auto, align="C")
+                                
+                                # 2. IMMAGINE AUTO (Prende in automatico quella della cartella foto_vetture)
+                                y_img = pdf.get_y() + 2
+                                f_path = f"foto_vetture/{auto['marca'].upper()}.jpg"
+                                if os.path.exists(f_path):
+                                    try: pdf.image(f_path, 25, y_img, 160)
+                                    except: pass
+                                
+                                # 3. PREZZO GIGANTE
+                                pdf.set_y(155)
+                                pdf.set_font(pdf.f_f, "B", 50) 
+                                pdf.set_text_color(201, 188, 65) 
+                                canone_str = str(auto['canone'])
+                                if canone_str.endswith(".0"): canone_str = canone_str[:-2]
+                                pdf.cell(0, 15, pulisci_testo(f"Euro {canone_str} / mese"), align="C", ln=True)
+                                
+                                # 4. BOTTONI DATI
+                                pdf.set_y(180)
+                                pdf.set_font(pdf.f_f, "B", 11)
+                                pdf.set_text_color(255, 255, 255)
+                                pdf.set_fill_color(40, 40, 40)
+                                
+                                anticipo_str = str(auto['anticipo'])
+                                if anticipo_str.endswith(".0"): anticipo_str = anticipo_str[:-2]
+                                
+                                voci = [
+                                    f"{auto['durata']} mesi", 
+                                    f"Km {auto['km']}", 
+                                    f"Anticipo {anticipo_str}", 
+                                    "Iva esclusa" # Standard per promozioni vetrina
+                                ]
+                                
+                                larghezza_box = 42
+                                spazio = 4
+                                start_x = (210 - (larghezza_box * 4 + spazio * 3)) / 2
+                                
+                                for i, voce in enumerate(voci):
+                                    x_pos = start_x + (larghezza_box + spazio) * i
+                                    pdf.set_xy(x_pos, 180)
+                                    pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
+                                
+                                # 5. SERVIZI INCLUSI (Testo generico per locandina rapida)
+                                pdf.set_y(202)
+                                pdf.set_font(pdf.f_f, "B", 11)
+                                pdf.set_text_color(255, 255, 255)
+                                pdf.set_x(10)
+                                pdf.cell(0, 6, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
+                                pdf.set_font(pdf.f_f, "", 9)
+                                testo_servizi = "Copertura RCA | Incendio e Furto | Riparazione Danni | Manutenzione Ordinaria e Straordinaria | Soccorso Stradale"
+                                pdf.set_x(10)
+                                pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
+
+                                # 6. NOTE LEGALI
+                                pdf.ln(5)
+                                pdf.set_font(pdf.f_f, "I", 8)
+                                pdf.set_text_color(180, 180, 180) 
+                                pdf.set_x(10) 
+                                pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale. Offerta soggetta ad approvazione della società di noleggio."), align="C")
+
+                                # 8. RIFERIMENTI VENDITORE (Automatici in base al login)
+                                pdf.set_y(255)
+                                pdf.set_font(pdf.f_f, "B", 10)
+                                pdf.set_text_color(255, 255, 255)
+                                pdf.set_x(10)
+                                pdf.cell(0, 5, pulisci_testo(f"CONSULENTE: {utente_loggato['nome'].upper()}"), align="C", ln=True)
+                                pdf.set_font(pdf.f_f, "", 9)
+                                pdf.set_text_color(200, 200, 200)
+                                pdf.set_x(10)
+                                pdf.cell(0, 5, pulisci_testo(f"E-mail: {utente_loggato['email']}  |  Tel: {utente_loggato['tel']}"), align="C", ln=True)
+
+                                # SALVA IL PDF IN MEMORIA
+                                file_name = f"Promo_{auto['marca']}_{idx}.pdf"
+                                pdf.output(file_name)
+                                st.session_state[f"pdf_ready_{idx}"] = file_name
+                                st.rerun()
+
+                            # MOSTRA IL PULSANTE DI DOWNLOAD QUANDO IL PDF È PRONTO
+                            if st.session_state.get(f"pdf_ready_{idx}"):
+                                with open(st.session_state[f"pdf_ready_{idx}"], "rb") as f:
+                                    st.download_button(
+                                        label="⬇️ SCARICA LOCANDINA", 
+                                        data=f, 
+                                        file_name=f"Promo_Maldarizzi_{auto['marca']}.pdf", 
+                                        key=f"dl_{idx}",
+                                        type="primary"
+                                    )
             except Exception as e:
                 st.error(f"Si è verificato un errore nella lettura del file Excel: {str(e)}")
         else:
@@ -630,3 +733,4 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
