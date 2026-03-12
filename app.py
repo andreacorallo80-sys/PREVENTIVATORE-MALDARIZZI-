@@ -23,7 +23,7 @@ def pulisci_testo(testo):
 
 # --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (INTELLIGENTE A 3 TENTATIVI) ---
 def scarica_foto_auto_api(marca, modello):
-    api_key = "----------------" 
+    api_key = "j8j4go0fx_wdw4h58n5_ydn6f4mk8" 
     
     marca_clean = str(marca).strip()
     
@@ -821,4 +821,5 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
+
 
