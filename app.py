@@ -143,6 +143,15 @@ if "val_tipo_gomme" not in st.session_state: st.session_state["val_tipo_gomme"] 
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
+# --- HELPER PER LETTURA FILE ---
+def leggi_file_dati(percorso):
+    if percorso.endswith(".csv"):
+        # Prova vari delimitatori (virgola o punto e virgola)
+        try: return pd.read_csv(percorso, sep=",")
+        except: return pd.read_csv(percorso, sep=";")
+    else:
+        return pd.read_excel(percorso)
+
 # --- 2. CLASSE PDF ---
 class MaldarizziPDF(FPDF):
     def __init__(self):
@@ -174,6 +183,9 @@ except: pass
 
 if check_password():
     utente_loggato = st.session_state["current_user"]
+    nome_cons = utente_loggato["nome"]
+    email_cons = utente_loggato["email"]
+    tel_cons = utente_loggato["tel"]
     
     # --- MENU LATERALE ---
     if os.path.exists("logo.png"): st.sidebar.image("logo.png", width=180)
@@ -200,9 +212,62 @@ if check_password():
         
     st.sidebar.markdown("---")
     
-    # MOSTRA CARRELLO FASCICOLO NEL MENU LATERALE
+    # ==========================================
+    # CARRELLO E STAMPA FASCICOLO NEL MENU LATERALE
+    # ==========================================
     if len(st.session_state["lista_preventivi"]) > 0:
-        st.sidebar.info(f"🛒 **FASCICOLO ATTIVO**\nHai {len(st.session_state['lista_preventivi'])} auto nel preventivo.")
+        st.sidebar.info(f"🛒 **FASCICOLO PRONTO**\nHai **{len(st.session_state['lista_preventivi'])}** auto in lista.")
+        
+        # Generazione PDF istantanea in background
+        pdf_fascicolo = MaldarizziPDF()
+        for i, p in enumerate(st.session_state["lista_preventivi"]):
+            pdf_fascicolo.add_page()
+            pdf_fascicolo.set_y(20); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 12); pdf_fascicolo.set_text_color(200, 200, 200); pdf_fascicolo.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
+            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 16); pdf_fascicolo.set_text_color(255, 255, 255); pdf_fascicolo.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
+            pdf_fascicolo.set_y(45); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 24); pdf_fascicolo.multi_cell(0, 10, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
+            
+            if p.get("foto_bytes"):
+                f_path = f"tmp_multi_{i}.jpg" 
+                with open(f_path, "wb") as f: f.write(p["foto_bytes"])
+                try: pdf_fascicolo.image(f_path, 25, pdf_fascicolo.get_y() + 2, 160)
+                except Exception as e: pass
+            
+            pdf_fascicolo.set_y(155); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 50); pdf_fascicolo.set_text_color(201, 188, 65)
+            pdf_fascicolo.cell(0, 15, pulisci_testo(f"Euro {str(p['canone']).replace('.0','')} / mese"), align="C", ln=True)
+            pdf_fascicolo.set_y(180); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 11); pdf_fascicolo.set_text_color(255, 255, 255); pdf_fascicolo.set_fill_color(40, 40, 40)
+            
+            km_tot_calc = int(p['km']) * int(p['durata']) // 12
+            voci = [f"{p['durata']} mesi", f"Km {km_tot_calc}", f"Anticipo {str(p['anticipo']).replace('.0','')}", p['iva_text']]
+            start_x = (210 - (42 * 4 + 4 * 3)) / 2
+            for idx, voce in enumerate(voci):
+                pdf_fascicolo.set_xy(start_x + (42 + 4) * idx, 180); pdf_fascicolo.cell(42, 10, pulisci_testo(voce), align="C", fill=True)
+            
+            pdf_fascicolo.set_y(202); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 11); pdf_fascicolo.set_x(10); pdf_fascicolo.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
+            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 9)
+            serv_list = [f"RCA ({p['p_rca']})", f"I/F ({p['p_if']})", f"Kasko ({p['p_kasko']})", "Manutenzione", "Soccorso H24"]
+            if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
+            if p.get('infort'): serv_list.append("PAI")
+            if p.get('vett_sost'): serv_list.append(f"Auto Sost. ({p['vett_sost']})")
+            pdf_fascicolo.set_x(10); pdf_fascicolo.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
+
+            if p.get('opt'):
+                pdf_fascicolo.ln(2); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10); pdf_fascicolo.set_text_color(201, 188, 65); pdf_fascicolo.cell(0, 6, "OPTIONAL INCLUSI", ln=True, align="C")
+                pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 8); pdf_fascicolo.set_text_color(255, 255, 255); pdf_fascicolo.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
+
+            pdf_fascicolo.ln(3); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "I", 8); pdf_fascicolo.set_text_color(180, 180, 180)
+            pdf_fascicolo.multi_cell(0, 4, "*Le immagini sono puramente indicative.\n*Canone non comprende la tassa automobilistica.\n*Validità offerta: 30 giorni.", align="C")
+            
+            pdf_fascicolo.set_y(255); pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10); pdf_fascicolo.set_text_color(255, 255, 255)
+            pdf_fascicolo.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
+            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 9); pdf_fascicolo.set_text_color(200, 200, 200)
+            pdf_fascicolo.cell(0, 5, f"E-mail: {email_cons}  |  Tel: {tel_cons}", align="C", ln=True)
+
+        pdf_fascicolo.output("preventivo_fascicolo_sidebar.pdf")
+        
+        # Bottone di Stampa visibile in tutte le pagine
+        with open("preventivo_fascicolo_sidebar.pdf", "rb") as f:
+            st.sidebar.download_button("📩 SCARICA FASCICOLO (PDF)", f, "Fascicolo_Offerte.pdf", "application/pdf")
+            
         if st.sidebar.button("🗑️ Svuota Fascicolo"):
             st.session_state["lista_preventivi"] = []
             st.rerun()
@@ -213,25 +278,56 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: VETRINA CON LOGICA INTELLIGENTE E FASCICOLO RAPIDO
+    # SEZIONE 1: VETRINA CON DOPPIO DATABASE
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le offerte. Puoi personalizzarle nel preventivatore o aggiungerle direttamente al Fascicolo!")
+        st.markdown("Sfoglia le offerte ordinate dal prezzo più basso. Personalizzale o aggiungile al Fascicolo!")
         
-        st.sidebar.header("📥 Gestione Database Promo")
-        file_promo = st.sidebar.file_uploader("Carica il file Excel delle promozioni", type=["xlsx", "csv"])
-        if file_promo:
-            with open("promo_mese.xlsx", "wb") as f: f.write(file_promo.getbuffer())
-            st.sidebar.success("✅ Database aggiornato!")
+        with st.sidebar.expander("📥 CARICAMENTO DATABASE PROMO", expanded=False):
+            file_promo = st.file_uploader("1. Carica File Promozioni Generico", type=["xlsx", "csv"], key="file1")
+            if file_promo:
+                with open("promo_mese.xlsx", "wb") as f: f.write(file_promo.getbuffer())
+                st.success("DB Generico aggiornato!")
 
+            file_4v = st.file_uploader("2. Carica File 4Vantage Ayvens", type=["xlsx", "csv"], key="file2")
+            if file_4v:
+                with open("promo_4vantage.csv", "wb") as f: f.write(file_4v.getbuffer())
+                st.success("DB 4Vantage aggiornato!")
+
+        # Creazione del Super-Database Unito
+        df_list = []
         if os.path.exists("promo_mese.xlsx"):
             try:
-                df_promo = pd.read_excel("promo_mese.xlsx")
-                df_promo.columns = df_promo.columns.str.strip()
+                df_main = leggi_file_dati("promo_mese.xlsx")
+                df_main.columns = df_main.columns.str.strip().str.upper()
+                df_list.append(df_main)
+            except: pass
+
+        if os.path.exists("promo_4vantage.csv"):
+            try:
+                df_4v = leggi_file_dati("promo_4vantage.csv")
+                df_4v.columns = df_4v.columns.str.strip().str.upper()
+                
+                # Mappatura delle colonne di 4Vantage per farle coincidere col DB principale
+                rename_map = {
+                    'MARCHIO': 'MARCA',
+                    'KMS': 'KM TOTALI',
+                    'FUEL': 'ALIMENTAZIONE',
+                    'COMMISSIONE': 'COMMISSIONI'
+                }
+                df_4v = df_4v.rename(columns=rename_map)
+                df_4v['OFFERTA'] = "4Vantage" # Aggiungo etichetta fissa per la logica
+                if 'PLAYER' not in df_4v.columns: df_4v['PLAYER'] = "Ayvens"
+                
+                df_list.append(df_4v)
+            except: pass
+
+        if df_list:
+            try:
+                df_promo = pd.concat(df_list, ignore_index=True)
                 df_promo = df_promo.fillna("") 
                 
-                # AGGIUNTA FILTRO SOCIETÀ DI NOLEGGIO (PLAYER)
                 c_search, c_alimen, c_player = st.columns([2, 1, 1])
                 with c_search: 
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
@@ -257,7 +353,7 @@ if check_password():
                     offerta_tipo = str(row.get('OFFERTA', '')).strip()
                     player = str(row.get('PLAYER', '')).strip().upper()
                     commissioni = str(row.get('COMMISSIONI', '')).strip()
-                    link_raw = str(row.get('link offerta', '')).strip()
+                    link_raw = str(row.get('LINK OFFERTA', '')).strip()
                     link_valido = link_raw if link_raw.startswith("http") else ("https://" + link_raw if link_raw.startswith("www") else "")
                     
                     try: canone = int(float(str(row.get('CANONE', 0)).replace(',','.')))
@@ -266,7 +362,7 @@ if check_password():
                     except: anticipo = 0
                     try: mesi = int(row.get('MESI', 0))
                     except: mesi = 0
-                    try: km = int(row.get('KM TOTALI', 0))
+                    try: km = int(float(str(row.get('KM TOTALI', 0)).replace(' ', '')))
                     except: km = 0
 
                     if ricerca and ricerca not in marca and ricerca not in modello.upper(): continue
@@ -278,6 +374,9 @@ if check_password():
                         "anticipo": anticipo, "durata": mesi, "km_totali": km,
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
+                
+                # --- ORDINAMENTO CRESCENTE PER PREZZO (CANONE) ---
+                offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
                 
                 if not offerte_filtrate:
                     st.warning("Nessuna offerta trovata con questi parametri.")
@@ -382,11 +481,12 @@ if check_password():
                                         }
                                         st.session_state["lista_preventivi"].append(auto_aggiunta)
                                         st.success(f"✅ {auto['marca']} aggiunta al Fascicolo!")
+                                        st.rerun() # Forza ricaricamento per mostrare il bottone di stampa a lato sùbito
 
             except Exception as e:
-                st.error(f"Errore lettura Excel: {str(e)}")
+                st.error(f"Errore caricamento database: {str(e)}")
         else:
-            st.info("👈 Carica il file Excel delle promozioni dal menù laterale.")
+            st.info("👈 Apri il menù 'Caricamento Database Promo' nel menù laterale per inserire i file.")
 
 
     # ==========================================
@@ -468,20 +568,16 @@ if check_password():
         uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
         if uploaded_excel:
             with open("dati.xlsx", "wb") as f: f.write(uploaded_excel.getbuffer())
-            st.sidebar.success("Database aggiornato!")
+            st.sidebar.success("Database Listino aggiornato!")
 
         if os.path.exists("dati.xlsx"):
             excel = pd.ExcelFile("dati.xlsx")
-            foglio = st.sidebar.selectbox("Seleziona Categoria", excel.sheet_names)
+            foglio = st.sidebar.selectbox("Seleziona Categoria Listino", excel.sheet_names)
             df = pd.read_excel("dati.xlsx", sheet_name=foglio, dtype=str)
         else:
             st.sidebar.warning("Carica dati.xlsx per ricerca da listino")
         
         g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
-
-        nome_cons = utente_loggato["nome"]
-        email_cons = utente_loggato["email"]
-        tel_cons = utente_loggato["tel"]
 
         c1, c2 = st.columns(2)
         with c1:
@@ -563,7 +659,7 @@ if check_password():
         st.markdown("---")
         
         # --- PULSANTE AGGIUNGI FASCICOLO (DAL PREVENTIVATORE) ---
-        if st.button("➕ AGGIUNGI AL FASCICOLO (PDF UNICO)"):
+        if st.button("➕ AGGIUNGI AL FASCICOLO"):
             foto_bytes = foto_m.getvalue() if foto_m else None
             if not foto_bytes:
                 with st.spinner('Ricerca immagine in corso...'):
@@ -580,60 +676,5 @@ if check_password():
                 "km": km, "iva_text": iva_text, "origine_dati": st.session_state.get("origine_preventivo", "Manuale") 
             }
             st.session_state["lista_preventivi"].append(auto_aggiunta)
-            st.success(f"✅ Veicolo aggiunto al Fascicolo!")
-
-        if len(st.session_state["lista_preventivi"]) > 0:
-            st.info(f"🛒 **Hai {len(st.session_state['lista_preventivi'])} veicoli nel Fascicolo.**")
-            col_stampa, col_svuota = st.columns([2, 1])
-            with col_svuota:
-                if st.button("🗑️ Svuota Fascicolo"):
-                    st.session_state["lista_preventivi"] = []
-                    st.rerun()
-            with col_stampa:
-                if st.button("🚀 STAMPA FASCICOLO (PDF UNICO)"):
-                    pdf = MaldarizziPDF()
-                    for i, p in enumerate(st.session_state["lista_preventivi"]):
-                        registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
-                        pdf.add_page()
-                        pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
-                        pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
-                        pdf.set_y(45); pdf.set_font(pdf.f_f, "B", 24); pdf.multi_cell(0, 10, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
-                        
-                        if p["foto_bytes"]:
-                            f_path = f"tmp_multi_{i}.jpg" 
-                            with open(f_path, "wb") as f: f.write(p["foto_bytes"])
-                            try: pdf.image(f_path, 25, pdf.get_y() + 2, 160)
-                            except Exception as e: st.error("L'immagine ha un formato incompatibile col PDF.")
-                        
-                        pdf.set_y(155); pdf.set_font(pdf.f_f, "B", 50); pdf.set_text_color(201, 188, 65)
-                        pdf.cell(0, 15, pulisci_testo(f"Euro {str(p['canone']).replace('.0','')} / mese"), align="C", ln=True)
-                        pdf.set_y(180); pdf.set_font(pdf.f_f, "B", 11); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(40, 40, 40)
-                        
-                        voci = [f"{p['durata']} mesi", f"Km {int(p['km']) * int(p['durata']) // 12}", f"Anticipo {str(p['anticipo']).replace('.0','')}", p['iva_text']]
-                        start_x = (210 - (42 * 4 + 4 * 3)) / 2
-                        for idx, voce in enumerate(voci):
-                            pdf.set_xy(start_x + (42 + 4) * idx, 180); pdf.cell(42, 10, pulisci_testo(voce), align="C", fill=True)
-                        
-                        pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
-                        pdf.set_font(pdf.f_f, "", 9)
-                        serv_list = [f"RCA ({p['p_rca']})", f"I/F ({p['p_if']})", f"Kasko ({p['p_kasko']})", "Manutenzione", "Soccorso H24"]
-                        if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
-                        if p.get('infort'): serv_list.append("PAI")
-                        if p.get('vett_sost'): serv_list.append(f"Auto Sost. ({p['vett_sost']})")
-                        pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
-
-                        if p.get('opt'):
-                            pdf.ln(2); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(201, 188, 65); pdf.cell(0, 6, "OPTIONAL INCLUSI", ln=True, align="C")
-                            pdf.set_font(pdf.f_f, "", 8); pdf.set_text_color(255, 255, 255); pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
-
-                        pdf.ln(3); pdf.set_font(pdf.f_f, "I", 8); pdf.set_text_color(180, 180, 180)
-                        pdf.multi_cell(0, 4, "*Le immagini sono puramente indicative.\n*Canone non comprende la tassa automobilistica.\n*Validità offerta: 30 giorni.", align="C")
-                        
-                        pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
-                        pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
-                        pdf.set_font(pdf.f_f, "", 9); pdf.set_text_color(200, 200, 200)
-                        pdf.cell(0, 5, f"E-mail: {email_cons}  |  Tel: {tel_cons}", align="C", ln=True)
-
-                    pdf.output("preventivo_fascicolo.pdf")
-                    with open("preventivo_fascicolo.pdf", "rb") as f:
-                        st.download_button("📩 SCARICA FASCICOLO", f, "Fascicolo_Offerte.pdf", key="dl_fascicolo")
+            st.success(f"✅ Veicolo aggiunto! Puoi stampare dal menù laterale a sinistra.")
+            st.rerun()
