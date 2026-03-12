@@ -25,14 +25,12 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI (GRATIS) ---
+# --- MOTORE FOTO (ATTUALMENTE SU GOOGLE) ---
 def scarica_foto_auto_api(marca, versione):
-    # ⚠️ INSERISCI QUI I TUOI DATI GOOGLE:
-    GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
-    GOOGLE_CX = "419da089f0736400f"
+    GOOGLE_API_KEY = "INSERISCI_QUI_LA_API_KEY_DI_GOOGLE"
+    GOOGLE_CX = "INSERISCI_QUI_IL_CX_DI_GOOGLE"
     
-    if GOOGLE_API_KEY == "inserisci qui la tua chiave api":
-        st.warning("⚠️ Diagnostica: Inserisci le chiavi di Google nel codice.")
+    if GOOGLE_API_KEY == "INSERISCI_QUI_LA_API_KEY_DI_GOOGLE":
         return None
 
     marca_clean = str(marca).strip().title()
@@ -40,60 +38,35 @@ def scarica_foto_auto_api(marca, versione):
     modello_clean = parti_versione[0].title() if parti_versione else ""
     trim_clean = " ".join(parti_versione[1:]).title() if len(parti_versione) > 1 else ""
     
-    # NOME FILE PER LA CACHE
     nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
     
-    # --- CONTROLLO MEMORIA ---
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto recuperata dalla Memoria Interna! (Costo: 0)")
             return f.read()
 
-    # --- CHIAMATA GOOGLE CUSTOM SEARCH API ---
     url_api = "https://www.googleapis.com/customsearch/v1"
-    
-    # Costruiamo la frase di ricerca perfetta per Google
     query_ricerca = f"{marca_clean} {modello_clean} {trim_clean} car exterior side view white background"
     
     parametri = {
-        "q": query_ricerca,
-        "cx": GOOGLE_CX,
-        "key": GOOGLE_API_KEY,
-        "searchType": "image",
-        "imgSize": "LARGE",
-        "num": 3 # Chiediamo i primi 3 risultati per sicurezza
+        "q": query_ricerca, "cx": GOOGLE_CX, "key": GOOGLE_API_KEY,
+        "searchType": "image", "imgSize": "LARGE", "num": 3
     }
     
     try:
         risposta = requests.get(url_api, params=parametri, timeout=10)
         if risposta.status_code == 200:
             dati_json = risposta.json()
-            
             if "items" in dati_json and len(dati_json["items"]) > 0:
-                # Proviamo a scaricare la prima immagine valida
                 for item in dati_json["items"]:
                     link_foto = item.get("link")
                     if link_foto:
                         try:
                             risposta_foto = requests.get(link_foto, timeout=5)
-                            # Assicuriamoci che sia un'immagine e non una pagina web
                             if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
-                                # SALVIAMO IN MEMORIA
-                                with open(nome_file_cache, "wb") as f:
-                                    f.write(risposta_foto.content)
-                                st.success("✅ FOTO GOOGLE: Scaricata e salvata in Memoria!")
+                                with open(nome_file_cache, "wb") as f: f.write(risposta_foto.content)
                                 return risposta_foto.content
-                        except:
-                            continue # Se il primo link di Google è "rotto", prova il secondo
-                            
-                st.error("❌ I link trovati da Google non erano immagini scaricabili.")
-            else:
-                st.warning(f"⚠️ Google non ha trovato immagini per questa ricerca.")
-        else:
-            st.error(f"❌ Errore Google API: {risposta.json().get('error', {}).get('message', 'Errore Sconosciuto')}")
-    except Exception as e:
-        st.error(f"❌ Errore di rete: {e}")
-        
+                        except: continue
+    except Exception: pass
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -101,21 +74,12 @@ def registra_statistica(consulente, cliente, marca, modello, canone, anticipo, d
     file_path = "statistiche_preventivi.csv"
     data_ora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     nuovo_dato = pd.DataFrame([{
-        "Data_Ora": data_ora,
-        "Consulente": consulente,
-        "Cliente": cliente,
-        "Marca": marca,
-        "Modello": modello,
-        "Canone_Mese": canone,
-        "Anticipo": anticipo,
-        "Durata_Mesi": durata,
-        "Km_Anno": km,
-        "Sorgente_Dati": origine
+        "Data_Ora": data_ora, "Consulente": consulente, "Cliente": cliente,
+        "Marca": marca, "Modello": modello, "Canone_Mese": canone,
+        "Anticipo": anticipo, "Durata_Mesi": durata, "Km_Anno": km, "Sorgente_Dati": origine
     }])
-    if os.path.exists(file_path):
-        nuovo_dato.to_csv(file_path, mode='a', header=False, index=False)
-    else:
-        nuovo_dato.to_csv(file_path, mode='w', header=True, index=False)
+    if os.path.exists(file_path): nuovo_dato.to_csv(file_path, mode='a', header=False, index=False)
+    else: nuovo_dato.to_csv(file_path, mode='w', header=True, index=False)
 
 # --- DATABASE VENDITORI ---
 DATABASE_UTENTI = {
@@ -128,7 +92,7 @@ DATABASE_UTENTI = {
     "l.grieco": {"pw": "Maldarizzi2026", "nome": "LUCA GRIECO", "email": "l.grieco@maldarizzi.com", "tel": "345 252 4566", "ruolo": "interno"},
     "m.schiralli": {"pw": "Maldarizzi2026", "nome": "MICHELE SCHIRALLI", "email": "m.schiralli@maldarizzi.com", "tel": "327 6810137", "ruolo": "interno"},
     "d.catanzaro": {"pw": "Maldarizzi2026", "nome": "DORIANA CATANZARO", "email": "d.catanzaro@maldarizzi.com", "tel": "349 756 8629", "ruolo": "interno"},
-    "v.miccoli": {"pw": "Maldarizzi2026", "nome": "VINCENZO MICCOLI", "email": "v.miccoli@maldarizzi.com", "tel": "3357403250", "ruolo": "interno"},
+    "v.schiralli": {"pw": "Maldarizzi2026", "nome": "VINCENZO SCHIRALLI", "email": "v.schiralli@maldarizzi.com", "tel": "327 681 0137", "ruolo": "interno"},
     "a.lozito": {"pw": "Maldarizzi2026", "nome": "ALESSANDRA LOZITO", "email": "a.lozito@maldarizzi.com", "tel": "340 450 7513", "ruolo": "interno"},
     "p.nolli": {"pw": "Maldarizzi2026", "nome": "PASQUALE NOLLI", "email": "pasquale@omniaprima.com", "tel": "331 399 3389", "ruolo": "interno"},
     "admin": {"pw": "cipiacemigliorare", "nome": "ADMIN MALDARIZZI", "email": "admin@admin.com", "tel": "000 0000000", "ruolo": "admin"}
@@ -144,8 +108,7 @@ def check_password():
         st.markdown("<style>.stApp { background-color: #000000; }</style>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            if os.path.exists("logo.png"): 
-                st.image("logo.png", width=200)
+            if os.path.exists("logo.png"): st.image("logo.png", width=200)
             st.subheader("Portale Noleggio Maldarizzi")
             user = st.text_input("Username (es. a.corallo)").lower().strip()
             password = st.text_input("Password", type="password")
@@ -155,14 +118,12 @@ def check_password():
                     st.session_state["authenticated"] = True
                     st.session_state["current_user"] = utente
                     st.rerun()
-                else:
-                    st.error("Credenziali errate o utente inesistente")
+                else: st.error("Credenziali errate o utente inesistente")
         return False
     return True
 
 # --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
-
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
@@ -177,7 +138,8 @@ if "val_opt" not in st.session_state: st.session_state["val_opt"] = ""
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
-if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
+if "val_usa_gomme" not in st.session_state: st.session_state["val_usa_gomme"] = True
+if "val_tipo_gomme" not in st.session_state: st.session_state["val_tipo_gomme"] = "ILLIMITATE"
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
@@ -187,31 +149,20 @@ class MaldarizziPDF(FPDF):
         super().__init__()
         self.set_margins(10, 10, 10)
         self.set_auto_page_break(False)
-        if os.path.exists("Rubik-Light.ttf"):
-            self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
-        if os.path.exists("Rubik-Bold.ttf"):
-            self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
+        if os.path.exists("Rubik-Light.ttf"): self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
+        if os.path.exists("Rubik-Bold.ttf"): self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
         self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
     def header(self):
         if os.path.exists("sfondo_nero.jpg"):
-            try:
-                self.image("sfondo_nero.jpg", 0, 0, 210, 297)
-            except Exception:
-                self.set_fill_color(20, 20, 20)
-                self.rect(0, 0, 210, 297, 'F')
-        else:
-            self.set_fill_color(20, 20, 20)
-            self.rect(0, 0, 210, 297, 'F')
+            try: self.image("sfondo_nero.jpg", 0, 0, 210, 297)
+            except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
+        else: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
 
         if os.path.exists("logo.png"):
-            try:
-                self.image("logo.png", 5, 5, 45) 
+            try: self.image("logo.png", 5, 5, 45) 
             except Exception: pass
-
-        if os.path.exists("logo.png"):
-            try:
-                self.image("logo.png", 145, 275, 55)
+            try: self.image("logo.png", 145, 275, 55)
             except Exception: pass
 
 # ==========================================
@@ -225,9 +176,7 @@ if check_password():
     utente_loggato = st.session_state["current_user"]
     
     # --- MENU LATERALE ---
-    if os.path.exists("logo.png"):
-        st.sidebar.image("logo.png", width=180)
-        
+    if os.path.exists("logo.png"): st.sidebar.image("logo.png", width=180)
     st.sidebar.markdown(f"👤 Benvenuto, **{utente_loggato['nome']}**")
     st.sidebar.markdown(f"🏷️ Ruolo: *{utente_loggato['ruolo'].upper()}*")
     st.sidebar.markdown("---")
@@ -236,12 +185,9 @@ if check_password():
         st.sidebar.markdown("### 📊 Pannello Direzione")
         if os.path.exists("statistiche_preventivi.csv"):
             df_stats = pd.read_csv("statistiche_preventivi.csv")
-            totale_prev = len(df_stats)
-            st.sidebar.success(f"Totale Preventivi Generati: **{totale_prev}**")
+            st.sidebar.success(f"Totale Preventivi: **{len(df_stats)}**")
             with open("statistiche_preventivi.csv", "rb") as f:
-                st.sidebar.download_button("📥 Scarica Excel Statistiche", data=f, file_name="Statistiche_Maldarizzi.csv", mime="text/csv")
-        else:
-            st.sidebar.warning("Nessun preventivo registrato finora.")
+                st.sidebar.download_button("📥 Scarica Statistiche", data=f, file_name="Statistiche.csv", mime="text/csv")
         st.sidebar.markdown("---")
 
     opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
@@ -257,17 +203,17 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: VETRINA
+    # SEZIONE 1: VETRINA CON LOGICA INTELLIGENTE
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le offerte, verifica i dettagli e trasferiscile nel preventivatore con un clic.")
+        st.markdown("Sfoglia le offerte. Cliccando 'Usa Promo', i servizi si imposteranno in automatico base al Player!")
         
         st.sidebar.header("📥 Gestione Database Promo")
         file_promo = st.sidebar.file_uploader("Carica il file Excel delle promozioni", type=["xlsx", "csv"])
         if file_promo:
             with open("promo_mese.xlsx", "wb") as f: f.write(file_promo.getbuffer())
-            st.sidebar.success("✅ Database Promozioni aggiornato!")
+            st.sidebar.success("✅ Database aggiornato!")
 
         if os.path.exists("promo_mese.xlsx"):
             try:
@@ -276,14 +222,12 @@ if check_password():
                 df_promo = df_promo.fillna("") 
                 
                 c_search, c_alimen = st.columns([2, 1])
-                with c_search:
-                    ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
+                with c_search: ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
                         lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
-                    else:
-                        filtro_alimen = "Tutte"
+                    else: filtro_alimen = "Tutte"
                 
                 st.markdown("---")
                 offerte_filtrate = []
@@ -321,7 +265,7 @@ if check_password():
                     colonne_griglia = st.columns(3)
                     for idx, auto in enumerate(offerte_filtrate):
                         with colonne_griglia[idx % 3]:
-                            link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41;">🔗 Apri Offerta Web</a>' if auto["link"] else '<span style="color: #888;">Nessun link web</span>'
+                            link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41;">🔗 Apri Offerta</a>' if auto["link"] else '<span style="color: #888;">Nessun link web</span>'
                             
                             st.markdown(f"""
                             <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-bottom: 15px;">
@@ -338,6 +282,7 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
+                            # CERVELLO LOGICO: TRASFERIMENTO DATI + FRANCHIGIE
                             if st.button(f"➡️ Usa Promo {auto['marca']}", key=f"btn_promo_{idx}"):
                                 st.session_state["val_marca_stampa"] = auto['marca']
                                 st.session_state["val_versione_stampa"] = auto['modello']
@@ -347,6 +292,32 @@ if check_password():
                                 st.session_state["val_km"] = auto['km']
                                 st.session_state["val_input_mode"] = "Testo Libero"
                                 st.session_state["origine_preventivo"] = "Vetrina Promo" 
+                                
+                                # SETTAGGIO AUTOMATICO FRANCHIGIE E SERVIZI (DA TABELLA EXCEL)
+                                p_upper = auto['player'].upper()
+                                t_upper = auto['tipo'].upper()
+                                
+                                # Base Fissa per tutti
+                                st.session_state["val_p_rca"] = "250 Euro"
+                                st.session_state["val_p_kasko"] = "500 Euro"
+                                st.session_state["val_usa_gomme"] = False
+                                st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+
+                                # Analisi Specifica
+                                if "AYVENS" in p_upper:
+                                    if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                        st.session_state["val_p_if"] = "0%"
+                                        st.session_state["val_usa_gomme"] = True
+                                        st.session_state["val_tipo_gomme"] = "INVERNALI"
+                                    else:
+                                        st.session_state["val_p_if"] = "500 Euro"
+                                elif "ARVAL" in p_upper:
+                                    st.session_state["val_p_if"] = "500 Euro"
+                                elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper:
+                                    st.session_state["val_p_if"] = "10%"
+                                else:
+                                    st.session_state["val_p_if"] = "10%" # Default di sicurezza
+
                                 st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
                                 st.rerun()
             except Exception as e:
@@ -356,10 +327,10 @@ if check_password():
 
 
     # ==========================================
-    # SEZIONE 2: PREVENTIVATORE
+    # SEZIONE 2: PREVENTIVATORE STRUMENTALE
     # ==========================================
     elif st.session_state["pagina_attiva"] == "🎯 Preventivatore Strumentale":
-        st.title("🎯 Preventivatore Strumentale (Con Motore Google)")
+        st.title("🎯 Preventivatore Strumentale")
         
         st.sidebar.header("📥 Importa PDF Portale")
         pdf_portale = st.sidebar.file_uploader("Carica PDF (Arval, Leasys, Ayvens)", type=["pdf"])
@@ -369,7 +340,6 @@ if check_password():
                 reader = pypdf.PdfReader(pdf_bytes)
                 testo_flat = re.sub(r'\s+', ' ', "".join([p.extract_text() for p in reader.pages])).strip()
                 testo_upper = testo_flat.upper()
-                st.session_state["debug_text"] = testo_flat
                 st.session_state["val_input_mode"] = "Testo Libero"
                 st.session_state["origine_preventivo"] = "Importazione da PDF"
                 
@@ -476,7 +446,7 @@ if check_password():
                 versione_stampa = versione_sel
             
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
-            foto_m = st.file_uploader("Foto Auto (Se vuoto usa GOOGLE API)", type=["jpg", "png", "jpeg"])
+            foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
 
         st.markdown("---")
         st.subheader("🛡️ Servizi e Penali")
@@ -486,6 +456,7 @@ if check_password():
             rca_options = ["0 Euro", "250 Euro", "500 Euro"]
             rca_idx = rca_options.index(st.session_state.get("val_p_rca", "250 Euro")) if st.session_state.get("val_p_rca", "250 Euro") in rca_options else 1
             p_rca = st.selectbox("Penale RCA", rca_options, index=rca_idx)
+            
             if_options = ["0%", "5%", "10%", "250 Euro", "500 Euro"]
             if_idx = if_options.index(st.session_state.get("val_p_if", "10%")) if st.session_state.get("val_p_if", "10%") in if_options else 2
             p_if = st.selectbox("Penale Incendio/Furto", if_options, index=if_idx)
@@ -499,12 +470,20 @@ if check_password():
             vett_sost_cat = st.selectbox("Categoria Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY"]) if usa_vett_sost else None
         
         with s3:
-            usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
+            # LETTURA AUTOMATICA DELLE GOMME
+            usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", True))
             g_num = "ILLIMITATE"
             if usa_gomme:
-                if st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True) == "A NUMERO":
+                opzioni_gomme = ["ILLIMITATE", "A NUMERO", "INVERNALI"]
+                idx_gomme = opzioni_gomme.index(st.session_state.get("val_tipo_gomme", "ILLIMITATE")) if st.session_state.get("val_tipo_gomme", "ILLIMITATE") in opzioni_gomme else 0
+                g_tipo = st.radio("Tipo Gomme", opzioni_gomme, horizontal=True, index=idx_gomme)
+                
+                if g_tipo == "A NUMERO":
                     g_num = st.number_input("N. Gomme", value=4, min_value=1)
-            else: g_num = None
+                elif g_tipo == "INVERNALI":
+                    g_num = "INVERNALI"
+            else: 
+                g_num = None
 
         st.markdown("---")
         st.subheader("💸 Dati Economici")
@@ -523,7 +502,7 @@ if check_password():
         if st.button("➕ AGGIUNGI AL DOCUMENTO"):
             foto_bytes = foto_m.getvalue() if foto_m else None
             if not foto_bytes:
-                with st.spinner('Ricerca immagine su Google in corso...'):
+                with st.spinner('Ricerca immagine in corso...'):
                     foto_bytes_api = scarica_foto_auto_api(marca_stampa, versione_stampa)
                     if foto_bytes_api: foto_bytes = foto_bytes_api
             
@@ -559,7 +538,7 @@ if check_password():
                             f_path = f"tmp_multi_{i}.jpg" 
                             with open(f_path, "wb") as f: f.write(p["foto_bytes"])
                             try: pdf.image(f_path, 25, pdf.get_y() + 2, 160)
-                            except Exception as e: st.error("L'immagine di Google ha un formato incompatibile col PDF.")
+                            except Exception as e: st.error("L'immagine ha un formato incompatibile col PDF.")
                         
                         pdf.set_y(155); pdf.set_font(pdf.f_f, "B", 50); pdf.set_text_color(201, 188, 65)
                         pdf.cell(0, 15, pulisci_testo(f"Euro {str(p['canone']).replace('.0','')} / mese"), align="C", ln=True)
@@ -593,7 +572,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
-
-
-
-
