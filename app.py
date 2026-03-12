@@ -64,7 +64,7 @@ def check_password():
 
 # --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
-if "promo_selezionate" not in st.session_state: st.session_state["promo_selezionate"] = [] # CARRELLO PER VETRINA
+if "promo_selezionate" not in st.session_state: st.session_state["promo_selezionate"] = [] 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
@@ -118,17 +118,19 @@ class MaldarizziPDF(FPDF):
 # --- FUNZIONE INTELLIGENTE ESTRAZIONE DATI EXCEL ---
 def estrai_dati_excel(df, origin_name):
     offerte = []
-    # Standardizza tutte le colonne in maiuscolo per evitare errori
     df.columns = df.columns.str.strip().str.upper()
     df = df.fillna("")
     
     for _, row in df.iterrows():
-        # Fallback intelligenti per i nomi delle colonne
         marca = str(row.get('MARCA', row.get('MARCHIO', ''))).strip().upper()
         modello = str(row.get('MODELLO', '')).strip()
         alimen = str(row.get('ALIMENTAZIONE', row.get('FUEL', ''))).strip().upper()
         offerta_tipo = str(row.get('OFFERTA', origin_name)).strip()
+        
         player = str(row.get('PLAYER', '')).strip().upper()
+        if not player:
+            player = origin_name.upper()
+            
         commissioni = str(row.get('COMMISSIONI', '')).strip()
         link_offerta = str(row.get('LINK OFFERTA', '')).strip()
         
@@ -141,7 +143,6 @@ def estrai_dati_excel(df, origin_name):
         try: km = int(row.get('KM TOTALI', row.get('KMS', 0)))
         except: km = 0
 
-        # Salta le righe vuote
         if not marca or canone == 0: continue
             
         offerte.append({
@@ -162,7 +163,6 @@ except: pass
 if check_password():
     utente_loggato = st.session_state["current_user"]
     
-    # --- MENU DI NAVIGAZIONE LATERALE ---
     if os.path.exists("logo.png"):
         st.sidebar.image("logo.png", width=180)
         
@@ -186,13 +186,13 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: DASHBOARD PROMO (VETRINA DA EXCEL MULTIPLI)
+    # SEZIONE 1: DASHBOARD PROMO 
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
         st.title("🔥 Promozioni del Mese")
         st.markdown("Sfoglia le offerte, raggruppale in un fascicolo o trasferiscile nel preventivatore.")
         
-        # GESTIONE CARRELLO VETRINA
+        # GESTIONE CARRELLO VETRINA (STAMPA GRIGLIA WHITE-LABEL)
         if len(st.session_state["promo_selezionate"]) > 0:
             st.info(f"🛒 Hai selezionato **{len(st.session_state['promo_selezionate'])}** offerte per il fascicolo vetrina.")
             colV1, colV2 = st.columns([2, 1])
@@ -201,87 +201,73 @@ if check_password():
                     st.session_state["promo_selezionate"] = []
                     st.rerun()
             with colV1:
-                # STAMPA FASCICOLO VETRINA MULTIPLO
-                if st.button("🚀 STAMPA FASCICOLO VETRINA (PDF)"):
+                if st.button("🚀 STAMPA FASCICOLO VETRINA (PDF CLIENTE)"):
                     pdf = MaldarizziPDF()
-                    for idx, auto in enumerate(st.session_state["promo_selezionate"]):
-                        pdf.add_page()
+                    pdf.add_page()
+                    
+                    pdf.set_y(30)
+                    pdf.set_font(pdf.f_f, "B", 24)
+                    pdf.set_text_color(201, 188, 65) 
+                    pdf.cell(0, 10, "FASCICOLO OFFERTE PROMOZIONALI", align="C", ln=True)
+                    
+                    pdf.set_font(pdf.f_f, "", 10)
+                    pdf.set_text_color(200, 200, 200)
+                    data_oggi = datetime.now().strftime("%d/%m/%Y")
+                    pdf.cell(0, 5, f"Proposta commerciale a cura di: {utente_loggato['nome']} - {data_oggi}", align="C", ln=True)
+                    pdf.ln(10)
+                    
+                    pdf.set_fill_color(40, 40, 40)
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.set_font(pdf.f_f, "B", 9)
+                    
+                    # NUOVE MISURE SENZA PLAYER (Totale sempre ~190)
+                    w_auto, w_canone, w_ant, w_dati = 90, 30, 35, 35
+                    
+                    pdf.cell(w_auto, 10, " VETTURA", border=1, fill=True)
+                    pdf.cell(w_canone, 10, "CANONE", border=1, align="C", fill=True)
+                    pdf.cell(w_ant, 10, "ANTICIPO", border=1, align="C", fill=True)
+                    pdf.cell(w_dati, 10, "MESI / KM", border=1, align="C", fill=True)
+                    pdf.ln()
+
+                    for auto in st.session_state["promo_selezionate"]:
+                        if pdf.get_y() > 250:
+                            pdf.add_page()
+                            pdf.set_y(30)
+                            pdf.set_fill_color(40, 40, 40)
+                            pdf.set_text_color(255, 255, 255)
+                            pdf.set_font(pdf.f_f, "B", 9)
+                            pdf.cell(w_auto, 10, " VETTURA", border=1, fill=True)
+                            pdf.cell(w_canone, 10, "CANONE", border=1, align="C", fill=True)
+                            pdf.cell(w_ant, 10, "ANTICIPO", border=1, align="C", fill=True)
+                            pdf.cell(w_dati, 10, "MESI / KM", border=1, align="C", fill=True)
+                            pdf.ln()
+
+                        nome_auto = f"{auto['marca']} {auto['modello']}"
+                        if len(nome_auto) > 52: nome_auto = nome_auto[:49] + "..."
                         
-                        pdf.set_y(20)
-                        pdf.set_font(pdf.f_f, "", 12)
-                        pdf.set_text_color(200, 200, 200)
-                        pdf.cell(0, 5, "Offerta Promozionale:", align="C", ln=True)
-                        pdf.set_font(pdf.f_f, "B", 16)
-                        pdf.set_text_color(255, 255, 255) 
-                        pdf.cell(0, 7, "GENTILE CLIENTE", align="C", ln=True)
-                        
-                        pdf.set_y(45)
-                        pdf.set_font(pdf.f_f, "B", 24)
-                        pdf.set_text_color(255, 255, 255)
-                        titolo_auto = pulisci_testo(f"{auto['marca']} {auto['modello']}")
-                        pdf.multi_cell(0, 10, titolo_auto, align="C")
-                        
-                        y_img = pdf.get_y() + 2
-                        f_path = f"foto_vetture/{auto['marca'].upper()}.jpg"
-                        if os.path.exists(f_path):
-                            try: pdf.image(f_path, 25, y_img, 160)
-                            except: pass
-                        
-                        pdf.set_y(155)
-                        pdf.set_font(pdf.f_f, "B", 50) 
-                        pdf.set_text_color(201, 188, 65) 
                         canone_str = str(auto['canone'])
                         if canone_str.endswith(".0"): canone_str = canone_str[:-2]
-                        pdf.cell(0, 15, pulisci_testo(f"Euro {canone_str} / mese"), align="C", ln=True)
-                        
-                        pdf.set_y(180)
-                        pdf.set_font(pdf.f_f, "B", 11)
-                        pdf.set_text_color(255, 255, 255)
-                        pdf.set_fill_color(40, 40, 40)
-                        
                         anticipo_str = str(auto['anticipo'])
                         if anticipo_str.endswith(".0"): anticipo_str = anticipo_str[:-2]
                         
-                        voci = [
-                            f"{auto['durata']} mesi", 
-                            f"Km {auto['km']}", 
-                            f"Anticipo {anticipo_str}", 
-                            "Iva esclusa"
-                        ]
-                        
-                        larghezza_box = 42
-                        spazio = 4
-                        start_x = (210 - (larghezza_box * 4 + spazio * 3)) / 2
-                        for i, voce in enumerate(voci):
-                            x_pos = start_x + (larghezza_box + spazio) * i
-                            pdf.set_xy(x_pos, 180)
-                            pdf.cell(larghezza_box, 10, pulisci_testo(voce), border=0, align="C", fill=True)
-                        
-                        pdf.set_y(202)
-                        pdf.set_font(pdf.f_f, "B", 11)
                         pdf.set_text_color(255, 255, 255)
-                        pdf.set_x(10)
-                        pdf.cell(0, 6, pulisci_testo("SERVIZI INCLUSI NEL CANONE"), ln=True, align="C")
-                        pdf.set_font(pdf.f_f, "", 9)
-                        testo_servizi = "Copertura RCA | Incendio e Furto | Riparazione Danni | Manutenzione Ordinaria e Straordinaria | Soccorso Stradale"
-                        pdf.set_x(10)
-                        pdf.multi_cell(0, 5, pulisci_testo(testo_servizi), align="C")
-
-                        pdf.ln(5)
-                        pdf.set_font(pdf.f_f, "I", 8)
-                        pdf.set_text_color(180, 180, 180) 
-                        pdf.set_x(10) 
-                        pdf.multi_cell(0, 4, pulisci_testo("*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale. Offerta soggetta ad approvazione della società di noleggio."), align="C")
-
-                        pdf.set_y(255)
+                        pdf.set_font(pdf.f_f, "B", 8)
+                        pdf.cell(w_auto, 10, f" {pulisci_testo(nome_auto)}", border=1)
+                        
+                        pdf.set_text_color(201, 188, 65)
                         pdf.set_font(pdf.f_f, "B", 10)
+                        pdf.cell(w_canone, 10, f"€ {canone_str}", border=1, align="C")
+                        
                         pdf.set_text_color(255, 255, 255)
-                        pdf.set_x(10)
-                        pdf.cell(0, 5, pulisci_testo(f"CONSULENTE: {utente_loggato['nome'].upper()}"), align="C", ln=True)
-                        pdf.set_font(pdf.f_f, "", 9)
-                        pdf.set_text_color(200, 200, 200)
-                        pdf.set_x(10)
-                        pdf.cell(0, 5, pulisci_testo(f"E-mail: {utente_loggato['email']}  |  Tel: {utente_loggato['tel']}"), align="C", ln=True)
+                        pdf.set_font(pdf.f_f, "", 8)
+                        pdf.cell(w_ant, 10, f"€ {anticipo_str}", border=1, align="C")
+                        pdf.cell(w_dati, 10, f"{auto['durata']}m / {auto['km']}km", border=1, align="C")
+                        pdf.ln()
+
+                    pdf.ln(10)
+                    pdf.set_font(pdf.f_f, "I", 8)
+                    pdf.set_text_color(180, 180, 180) 
+                    pdf.multi_cell(0, 4, pulisci_testo("*Tutti i valori economici riportati si intendono IVA esclusa. Le immagini, ove presenti, sono puramente indicative. Offerta soggetta ad approvazione della società di noleggio. Il canone non include la tassa automobilistica."), align="C")
 
                     file_vetrina = "Fascicolo_Vetrina_Maldarizzi.pdf"
                     pdf.output(file_vetrina)
@@ -290,7 +276,6 @@ if check_password():
 
         st.markdown("---")
 
-        # UPLOAD DEI DUE FILE EXCEL PROMO
         st.sidebar.header("📥 Database Promozioni")
         file_promo_1 = st.sidebar.file_uploader("File 1 (es. Promo Base)", type=["xlsx", "csv"])
         file_promo_2 = st.sidebar.file_uploader("File 2 (es. 4Vantage)", type=["xlsx", "csv"])
@@ -300,12 +285,11 @@ if check_password():
         if file_promo_2:
             with open("promo_2.xlsx", "wb") as f: f.write(file_promo_2.getbuffer())
 
-        # LETTURA E UNIONE DEI DATI
         tutte_offerte = []
         if os.path.exists("promo_1.xlsx"):
             try:
                 df1 = pd.read_excel("promo_1.xlsx")
-                tutte_offerte.extend(estrai_dati_excel(df1, "Standard"))
+                tutte_offerte.extend(estrai_dati_excel(df1, "Promo Base"))
             except Exception as e: st.sidebar.error(f"Errore File 1: {e}")
             
         if os.path.exists("promo_2.xlsx"):
@@ -315,16 +299,23 @@ if check_password():
             except Exception as e: st.sidebar.error(f"Errore File 2: {e}")
 
         if len(tutte_offerte) > 0:
-            # ORDINAMENTO PER CANONE (Dal più piccolo al più grande)
             tutte_offerte = sorted(tutte_offerte, key=lambda x: x['canone'])
             
-            c_search, c_alimen = st.columns([2, 1])
+            # --- TOGGLE MODALITÀ CLIENTE ---
+            nascondi_sensibili = st.checkbox("🕶️ Modalità Visiva Cliente (Nascondi Player e Commissioni sullo schermo)")
+            st.markdown("---")
+
+            c_search, c_alimen, c_player = st.columns([2, 1, 1])
             with c_search:
                 ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
             with c_alimen:
                 lista_alimen_disp = list(set([x['alimen'] for x in tutte_offerte if x['alimen']]))
                 lista_alimen = ["Tutte"] + sorted(lista_alimen_disp)
                 filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
+            with c_player:
+                lista_player_disp = list(set([x['player'] for x in tutte_offerte if x['player']]))
+                lista_player = ["Tutte"] + sorted(lista_player_disp)
+                filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
             
             st.markdown("---")
             
@@ -333,6 +324,8 @@ if check_password():
                 if ricerca and ricerca not in auto['marca'] and ricerca not in auto['modello'].upper():
                     continue
                 if filtro_alimen != "Tutte" and auto['alimen'] != filtro_alimen:
+                    continue
+                if filtro_player != "Tutte" and auto['player'] != filtro_player:
                     continue
                 offerte_filtrate.append(auto)
             
@@ -343,12 +336,25 @@ if check_password():
                 for idx, auto in enumerate(offerte_filtrate):
                     with colonne_griglia[idx % 3]:
                         
-                        # GESTIONE SICURA DEL LINK WEB
-                        if auto["link"] and str(auto["link"]).startswith("http"):
-                            link_html = f'<a href="{auto["link"]}" target="_blank" style="color: #C9BC41; text-decoration: none; font-size: 13px;">🔗 Apri pagina Offerta Web</a>'
+                        # CREAZIONE HTML CONDIZIONALE PER I DATI SENSIBILI
+                        if nascondi_sensibili:
+                            html_dati_sensibili = ""
                         else:
-                            link_html = '<span style="color: #888; font-size: 12px; font-style: italic;">Nessun link web valido inserito nel database</span>'
-                        
+                            if auto["link"] and str(auto["link"]).startswith("http"):
+                                link_html = f'<br><a href="{auto["link"]}" target="_blank" style="color: #C9BC41; text-decoration: none; font-size: 13px;">🔗 Apri pagina Offerta Web</a>'
+                            else:
+                                link_html = ""
+                                
+                            html_dati_sensibili = f"""
+                            <hr style="border-top: 1px solid #444; margin: 10px 0;">
+                            <p style="font-size: 13px; color: #BBB; line-height: 1.4; margin-bottom: 5px;">
+                                🏢 <b>Player:</b> {auto['player']}<br>
+                                🏷️ <b>Tipo:</b> {auto['tipo']}<br>
+                                💶 <b>Commissioni:</b> {auto['comm']}
+                                {link_html}
+                            </p>
+                            """
+
                         st.markdown(f"""
                         <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border: 1px solid #333; margin-bottom: 10px;">
                             <h3 style="margin-bottom: 0; color: #FFF;">{auto['marca']}</h3>
@@ -358,21 +364,14 @@ if check_password():
                                 ⏳ {auto['durata']} mesi | 🛣️ {auto['km']} Km totali<br>
                                 💰 Anticipo: € {auto['anticipo']}
                             </p>
-                            <hr style="border-top: 1px solid #444; margin: 10px 0;">
-                            <p style="font-size: 13px; color: #BBB; line-height: 1.4; margin-bottom: 5px;">
-                                🏢 <b>Player:</b> {auto['player']}<br>
-                                🏷️ <b>Tipo:</b> {auto['tipo']}<br>
-                                💶 <b>Commissioni:</b> {auto['comm']}
-                            </p>
-                            {link_html}
+                            {html_dati_sensibili}
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # I DUE PULSANTI D'AZIONE
                         btn1, btn2 = st.columns(2)
                         
                         with btn1:
-                            if st.button(f"➡️ Vai a Preventivatore", key=f"btn_prev_{idx}", help="Usa i dati di questa auto nel Preventivatore per aggiungere il nome cliente."):
+                            if st.button(f"➡️ Personalizza", key=f"btn_prev_{idx}", help="Porta nel Preventivatore per aggiungere il nome cliente."):
                                 st.session_state["val_marca_stampa"] = auto['marca']
                                 st.session_state["val_versione_stampa"] = auto['modello']
                                 st.session_state["val_canone"] = float(auto['canone'])
@@ -384,7 +383,7 @@ if check_password():
                                 st.rerun()
                                 
                         with btn2:
-                            if st.button(f"➕ Fascicolo", key=f"btn_fasc_{idx}", help="Aggiungi questa vettura al fascicolo vetrina per scaricare un PDF unico."):
+                            if st.button(f"➕ Fascicolo", key=f"btn_fasc_{idx}", help="Aggiungi alla stampa rapida PDF."):
                                 st.session_state["promo_selezionate"].append(auto)
                                 st.rerun()
                         
@@ -582,7 +581,6 @@ if check_password():
         
         with c2:
             st.subheader("🚘 Veicolo")
-            # Modalità forzata a "Testo Libero" dato che abbiamo rimosso il listino integrato
             idx_input_mode = 1 if st.session_state.get("val_input_mode") == "Testo Libero" else 0
             input_mode = st.radio("Modalità Inserimento", ["Da Listino", "Testo Libero"], horizontal=True, index=1)
             
