@@ -25,74 +25,72 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (REGOLE UFFICIALI + CACHE) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (SENZA BLOCCO ANNO + CACHE) ---
 def scarica_foto_auto_api(marca, versione):
     api_key = "j8j4go0fx_wdw4h58n5_ydn6f4mk8" 
     
-    # 1. RISPETTIAMO IL CASE SENSITIVE: Iniziale Maiuscola per ogni parola
+    # 1. Pulizia con Iniziale Maiuscola (Case Sensitive per CarsXE)
     marca_clean = str(marca).strip().title()
     
-    # 2. SEPARIAMO MODELLO E TRIM (Allestimento)
+    # 2. Separiamo il Modello dall'Allestimento
     parti_versione = str(versione).strip().split()
     modello_clean = parti_versione[0].title() if parti_versione else ""
+    trim_clean = " ".join(parti_versione[1:]).title() if len(parti_versione) > 1 else ""
     
-    # Se non viene fornito un allestimento, inseriamo "Base" (il filtro exterior lo esige)
-    trim_clean = " ".join(parti_versione[1:]).title() if len(parti_versione) > 1 else "Base"
-    
-    anno_corrente = str(datetime.now().year)
-    
-    # 3. NOME FILE PER LA CACHE (es. "citroen_c3_shine.jpg")
+    # 3. Nome del file per la memoria interna (es: "citroen_c3_shine.jpg")
     nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
     
     # --- CONTROLLO MEMORIA (RISPARMIO CREDITI) ---
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto recuperata all'istante dalla Memoria Interna! (Costo: 0 Crediti)")
+            st.success(f"⚡ FOTO IN MEMORIA: Ho recuperato {marca_clean} {modello_clean} all'istante senza consumare crediti!")
             return f.read()
 
-    # --- CHIAMATA API CARSXE (SE LA FOTO NON È IN MEMORIA) ---
+    # --- CHIAMATA API CARSXE (SE NON È IN MEMORIA) ---
     url_api = "https://api.carsxe.com/images"
     
-    # Parametri Base (Qualità e Angolazione)
-    params_base = {
+    # Tentativo 1: Con Allestimento (Usa solo angle=side per evitare foto degli interni)
+    params_1 = {
         "key": api_key, "make": marca_clean, "model": modello_clean,
-        "size": "Large", "angle": "side"
+        "angle": "side", "size": "Large"
+    }
+    if trim_clean:
+        params_1["trim"] = trim_clean
+        
+    # Tentativo 2: Solo Marca e Modello (Senza allestimento se è troppo strano)
+    params_2 = {
+        "key": api_key, "make": marca_clean, "model": modello_clean,
+        "angle": "side", "size": "Large"
     }
     
-    # Tentativo 1: PERFETTO (Usa tutti i parametri richiesti per avere "exterior")
-    params_1 = params_base.copy()
-    params_1.update({"year": anno_corrente, "trim": trim_clean, "photoType": "exterior"})
+    # Tentativo 3: Disperato (Toglie persino la restrizione laterale)
+    params_3 = { "key": api_key, "make": marca_clean, "model": modello_clean }
     
-    # Tentativo 2: EMERGENZA 1 (Se l'allestimento scritto dal venditore non esiste nel loro database)
-    params_2 = params_base.copy()
-    params_2.update({"year": anno_corrente, "trim": "Base", "photoType": "exterior"})
+    # Sceglie i tentativi in base a quanti dati abbiamo
+    tentativi = [params_1, params_2, params_3] if trim_clean else [params_2, params_3]
     
-    # Tentativo 3: EMERGENZA 2 (Rimuove il vincolo exterior se le prime due falliscono)
-    params_3 = params_base.copy()
-    
-    for p in [params_1, params_2, params_3]:
+    for tentativo_num, p in enumerate(tentativi, 1):
         try:
             risposta = requests.get(url_api, params=p, timeout=10)
             if risposta.status_code == 200:
                 dati_json = risposta.json()
                 
-                # Se NON c'è errore e ha trovato almeno 1 immagine
                 if not dati_json.get("error") and "images" in dati_json and len(dati_json["images"]) > 0:
                     link_prima_foto = dati_json["images"][0].get("link")
                     
                     if link_prima_foto:
                         risposta_foto = requests.get(link_prima_foto, timeout=10)
                         if risposta_foto.status_code == 200:
-                            # SALVIAMO LA FOTO IN MEMORIA PER IL FUTURO!
+                            # SALVATAGGIO NELLA MEMORIA INTERNA
                             with open(nome_file_cache, "wb") as f:
                                 f.write(risposta_foto.content)
                                 
-                            st.toast("✅ Foto in Alta Qualità scaricata da CarsXE e salvata in Memoria!")
+                            st.success(f"✅ CARSXE: Foto scaricata (Tentativo {tentativo_num}) e salvata in memoria per le prossime volte!")
                             return risposta_foto.content 
         except Exception:
-            continue # Passa al tentativo successivo se qualcosa va storto
+            continue # Se fallisce passa al tentativo meno restrittivo
             
-    st.warning(f"⚠️ CarsXE non ha trovato foto esterne per: {marca_clean} {modello_clean}")
+    st.error(f"❌ CARSXE VUOTO: Impossibile trovare la foto per {marca_clean} {modello_clean}. Verrà generato il PDF senza immagine.")
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -604,7 +602,7 @@ if check_password():
                 versione_stampa = versione_sel
             
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
-            foto_m = st.file_uploader("Foto Auto (Opzionale, altrimenti usa API Automatica CarsXE)", type=["jpg", "png", "jpeg"])
+            foto_m = st.file_uploader("Foto Auto (Opzionale, se vuoto usa API CarsXE)", type=["jpg", "png", "jpeg"])
 
         st.markdown("---")
         st.subheader("🛡️ Servizi e Penali")
@@ -678,7 +676,6 @@ if check_password():
                 "origine_dati": st.session_state.get("origine_preventivo", "Manuale") 
             }
             st.session_state["lista_preventivi"].append(auto_aggiunta)
-            st.success(f"✅ Veicolo aggiunto! (Totale: {len(st.session_state['lista_preventivi'])} veicoli)")
 
         if len(st.session_state["lista_preventivi"]) > 0:
             st.info(f"🛒 Hai aggiunto **{len(st.session_state['lista_preventivi'])}** veicoli al preventivo congiunto.")
