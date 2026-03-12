@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 import re
@@ -315,6 +315,9 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
+                # --- AGGIUNTA STEP 1: ORDINAMENTO PER CANONE ---
+                offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
+
                 if not offerte_filtrate:
                     st.warning("Nessuna offerta trovata con questi parametri.")
                 else:
