@@ -9,6 +9,10 @@ from fpdf import FPDF
 from datetime import datetime
 import locale
 
+# --- CREAZIONE CARTELLA CACHE PER RISPARMIARE CREDITI API ---
+if not os.path.exists("Foto_Cache"):
+    os.makedirs("Foto_Cache")
+
 # --- FUNZIONE PULIZIA TESTO ---
 def pulisci_testo(testo):
     if not testo: return ""
@@ -21,61 +25,74 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (INTELLIGENTE A 3 TENTATIVI) ---
-def scarica_foto_auto_api(marca, modello):
-    api_key = "*************" 
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA CARSXE (REGOLE UFFICIALI + CACHE) ---
+def scarica_foto_auto_api(marca, versione):
+    api_key = "j8j4go0fx_wdw4h58n5_ydn6f4mk8" 
     
-    marca_clean = str(marca).strip()
+    # 1. RISPETTIAMO IL CASE SENSITIVE: Iniziale Maiuscola per ogni parola
+    marca_clean = str(marca).strip().title()
     
-    # Separiamo il nome del modello dall'allestimento (trim)
-    parti_modello = str(modello).strip().split()
-    modello_clean = parti_modello[0] if parti_modello else ""
-    trim_clean = " ".join(parti_modello[1:]) if len(parti_modello) > 1 else ""
+    # 2. SEPARIAMO MODELLO E TRIM (Allestimento)
+    parti_versione = str(versione).strip().split()
+    modello_clean = parti_versione[0].title() if parti_versione else ""
     
-    # Calcoliamo l'anno in corso (le auto in leasing sono tipicamente nuove)
-    anno_corrente = datetime.now().year
+    # Se non viene fornito un allestimento, inseriamo "Base" (il filtro exterior lo esige)
+    trim_clean = " ".join(parti_versione[1:]).title() if len(parti_versione) > 1 else "Base"
     
+    anno_corrente = str(datetime.now().year)
+    
+    # 3. NOME FILE PER LA CACHE (es. "citroen_c3_shine.jpg")
+    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
+    
+    # --- CONTROLLO MEMORIA (RISPARMIO CREDITI) ---
+    if os.path.exists(nome_file_cache):
+        with open(nome_file_cache, "rb") as f:
+            st.toast(f"⚡ Foto recuperata all'istante dalla Memoria Interna! (Costo: 0 Crediti)")
+            return f.read()
+
+    # --- CHIAMATA API CARSXE (SE LA FOTO NON È IN MEMORIA) ---
     url_api = "https://api.carsxe.com/images"
     
-    # Prepariamo i 3 livelli di precisione per la ricerca
-    parametri_1 = { # Massima precisione
+    # Parametri Base (Qualità e Angolazione)
+    params_base = {
         "key": api_key, "make": marca_clean, "model": modello_clean,
-        "year": anno_corrente, "photoType": "exterior"
-    }
-    if trim_clean:
-        parametri_1["trim"] = trim_clean
-        
-    parametri_2 = { # Media precisione (ignora l'allestimento se è troppo strano)
-        "key": api_key, "make": marca_clean, "model": modello_clean,
-        "year": anno_corrente, "photoType": "exterior"
+        "size": "Large", "angle": "side"
     }
     
-    parametri_3 = { # Bassa precisione (prende la prima che trova se le altre falliscono)
-        "key": api_key, "make": marca_clean, "model": modello_clean
-    }
+    # Tentativo 1: PERFETTO (Usa tutti i parametri richiesti per avere "exterior")
+    params_1 = params_base.copy()
+    params_1.update({"year": anno_corrente, "trim": trim_clean, "photoType": "exterior"})
     
-    # Se c'è un trim proviamo tutti e 3, altrimenti solo 2 e 3
-    tentativi = [parametri_1, parametri_2, parametri_3] if trim_clean else [parametri_2, parametri_3]
-
-    for params in tentativi:
+    # Tentativo 2: EMERGENZA 1 (Se l'allestimento scritto dal venditore non esiste nel loro database)
+    params_2 = params_base.copy()
+    params_2.update({"year": anno_corrente, "trim": "Base", "photoType": "exterior"})
+    
+    # Tentativo 3: EMERGENZA 2 (Rimuove il vincolo exterior se le prime due falliscono)
+    params_3 = params_base.copy()
+    
+    for p in [params_1, params_2, params_3]:
         try:
-            risposta = requests.get(url_api, params=params, timeout=10)
+            risposta = requests.get(url_api, params=p, timeout=10)
             if risposta.status_code == 200:
                 dati_json = risposta.json()
                 
-                # Se NON c'è errore e ci sono immagini nella lista
+                # Se NON c'è errore e ha trovato almeno 1 immagine
                 if not dati_json.get("error") and "images" in dati_json and len(dati_json["images"]) > 0:
                     link_prima_foto = dati_json["images"][0].get("link")
                     
                     if link_prima_foto:
                         risposta_foto = requests.get(link_prima_foto, timeout=10)
                         if risposta_foto.status_code == 200:
-                            st.toast("✅ Foto esterna scaricata con successo da CarsXE!")
+                            # SALVIAMO LA FOTO IN MEMORIA PER IL FUTURO!
+                            with open(nome_file_cache, "wb") as f:
+                                f.write(risposta_foto.content)
+                                
+                            st.toast("✅ Foto in Alta Qualità scaricata da CarsXE e salvata in Memoria!")
                             return risposta_foto.content 
         except Exception:
-            continue # Se un tentativo fallisce (es. errore di rete), passa al successivo
+            continue # Passa al tentativo successivo se qualcosa va storto
             
-    st.warning(f"⚠️ CarsXE non ha trovato foto esterne adatte per: {marca_clean} {modello_clean}")
+    st.warning(f"⚠️ CarsXE non ha trovato foto esterne per: {marca_clean} {modello_clean}")
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -229,7 +246,7 @@ if check_password():
                     mime="text/csv"
                 )
         else:
-            st.sidebar.warning("Nessun preventivo registrato finora. Fai una stampa per attivare il contatore!")
+            st.sidebar.warning("Nessun preventivo registrato finora.")
         st.sidebar.markdown("---")
 
     opzioni_menu = ["🔥 Offerte del Mese", "🎯 Preventivatore Strumentale"]
@@ -821,6 +838,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO (DESIGN UFFICIALE)", f, f"Offerta_Multipla.pdf", key="dl_multi")
-
-
-
