@@ -8,7 +8,6 @@ import requests
 from fpdf import FPDF
 from datetime import datetime
 import locale
-import random
 
 # --- CREAZIONE CARTELLA CACHE PER RISPARMIARE CHIAMATE ---
 if not os.path.exists("Foto_Cache"):
@@ -25,30 +24,6 @@ def pulisci_testo(testo):
     for k, v in sostituzioni.items():
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
-
-# --- FUNZIONE EFFETTO CUORICINI ---
-def show_hearts():
-    hearts_html = """
-    <style>
-    @keyframes heart-fall { 
-        0% {top: -10%; opacity: 1; transform: rotate(0deg);} 
-        100% {top: 100%; opacity: 0; transform: rotate(360deg);} 
-    } 
-    .heart {
-        position: fixed; 
-        font-size: 2.5rem; 
-        color: #e74c3c; 
-        z-index: 9999; 
-        animation: heart-fall linear forwards;
-    }
-    </style>
-    """
-    for _ in range(40):
-        left = random.randint(0, 100)
-        delay = random.uniform(0, 2.5)
-        duration = random.uniform(2.5, 4.5)
-        hearts_html += f"<div class='heart' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>❤️</div>"
-    st.markdown(hearts_html, unsafe_allow_html=True)
 
 # --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI (GRATIS) ---
 def scarica_foto_auto_api(marca, versione):
@@ -189,9 +164,6 @@ def check_password():
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
-if "lista_fascicolo" not in st.session_state: st.session_state["lista_fascicolo"] = [] 
-if "pdf_carrello_pronto" not in st.session_state: st.session_state["pdf_carrello_pronto"] = False
-
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
 if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
@@ -205,11 +177,15 @@ if "val_opt" not in st.session_state: st.session_state["val_opt"] = ""
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
+if "val_usa_gomme" not in st.session_state: st.session_state["val_usa_gomme"] = False
+if "val_tipo_gomme" not in st.session_state: st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+if "val_n_gomme" not in st.session_state: st.session_state["val_n_gomme"] = 4
+if "val_stagione_gomme" not in st.session_state: st.session_state["val_stagione_gomme"] = "Estive"
 if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
-# --- 2. CLASSE PDF PREVENTIVATORE (VERTICALE) ---
+# --- 2. CLASSE PDF ---
 class MaldarizziPDF(FPDF):
     def __init__(self):
         super().__init__()
@@ -242,41 +218,6 @@ class MaldarizziPDF(FPDF):
                 self.image("logo.png", 145, 275, 55)
             except Exception: pass
 
-# --- 3. NUOVA CLASSE PDF CARRELLO (ORIZZONTALE) ---
-class FascicoloPDF(FPDF):
-    def __init__(self):
-        super().__init__(orientation='L', unit='mm', format='A4') 
-        self.set_margins(10, 10, 10)
-        self.set_auto_page_break(True, margin=15)
-        if os.path.exists("Rubik-Light.ttf"):
-            self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
-        if os.path.exists("Rubik-Bold.ttf"):
-            self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
-        self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
-
-    def header(self):
-        # Punta allo sfondo orizzontale richiesto
-        if os.path.exists("sfondo nero orizz.jpg"):
-            try:
-                self.image("sfondo nero orizz.jpg", 0, 0, 297, 210)
-            except Exception:
-                self.set_fill_color(20, 20, 20)
-                self.rect(0, 0, 297, 210, 'F')
-        elif os.path.exists("sfondo_nero.jpg"):
-            try:
-                self.image("sfondo_nero.jpg", 0, 0, 297, 210)
-            except Exception:
-                self.set_fill_color(20, 20, 20)
-                self.rect(0, 0, 297, 210, 'F')
-        else:
-            self.set_fill_color(20, 20, 20)
-            self.rect(0, 0, 297, 210, 'F')
-
-        if os.path.exists("logo.png"):
-            try:
-                self.image("logo.png", 10, 10, 45) 
-            except Exception: pass
-
 # ==========================================
 # AVVIO APP PRINCIPALE
 # ==========================================
@@ -286,6 +227,9 @@ except: pass
 
 if check_password():
     utente_loggato = st.session_state["current_user"]
+    nome_cons = utente_loggato["nome"]
+    email_cons = utente_loggato["email"]
+    tel_cons = utente_loggato["tel"]
     
     # --- MENU LATERALE ---
     if os.path.exists("logo.png"):
@@ -320,114 +264,9 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: VETRINA E CARRELLO PROMO
+    # SEZIONE 1: VETRINA
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
-        
-        # --- UI DEL CARRELLO PROMO (IN ALTO) ---
-        if len(st.session_state["lista_fascicolo"]) > 0:
-            st.info(f"🛒 **CARRELLO OFFERTE:** Hai {len(st.session_state['lista_fascicolo'])} promozioni selezionate.")
-            col_cart1, col_cart2, col_cart3 = st.columns([2, 1, 1])
-            with col_cart1:
-                cliente_carrello = st.text_input("👤 Intesta queste offerte a (Nome Cliente):", value=st.session_state.get("val_cliente", "Gentile CLIENTE"))
-                st.session_state["val_cliente"] = cliente_carrello
-            
-            with col_cart2:
-                st.write("") 
-                st.write("")
-                if st.button("🚀 GENERA STAMPA CARRELLO"):
-                    pdf = FascicoloPDF()
-                    pdf.add_page()
-                    
-                    pdf.set_y(35)
-                    pdf.set_font(pdf.f_f, "B", 18)
-                    pdf.set_text_color(201, 188, 65)
-                    pdf.cell(0, 10, "FASCICOLO OFFERTE COMMERCIALI", align="C", ln=True)
-                    
-                    pdf.set_font(pdf.f_f, "", 12)
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.cell(0, 8, f"Spett.le: {pulisci_testo(st.session_state['val_cliente'].upper())}", align="C", ln=True)
-                    pdf.ln(10)
-
-                    # INTESTAZIONE TABELLA GRIGLIA
-                    pdf.set_font(pdf.f_f, "B", 10)
-                    pdf.set_fill_color(50, 50, 50)
-                    pdf.set_text_color(201, 188, 65)
-                    w_vei, w_mesi, w_ant, w_can, w_serv = 70, 30, 25, 25, 127
-                    
-                    pdf.cell(w_vei, 10, " MARCA E MODELLO", border=1, fill=True)
-                    pdf.cell(w_mesi, 10, " MESI / KM", border=1, align="C", fill=True)
-                    pdf.cell(w_ant, 10, " ANTICIPO", border=1, align="C", fill=True)
-                    pdf.cell(w_can, 10, " CANONE", border=1, align="C", fill=True)
-                    pdf.cell(w_serv, 10, " PENALI E SERVIZI INCLUSI", border=1, fill=True)
-                    pdf.ln()
-
-                    # RIGHE
-                    pdf.set_text_color(255, 255, 255)
-                    for p in st.session_state["lista_fascicolo"]:
-                        # Logica Franchigie per la stampa
-                        p_upper = str(p['player']).upper()
-                        t_upper = str(p['tipo']).upper()
-                        p_if_val = "10%"
-                        gomme_str = ""
-                        
-                        if "AYVENS" in p_upper:
-                            if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
-                                p_if_val = "0%"
-                                gomme_str = " | Gomme Invernali"
-                            else: p_if_val = "500 Euro"
-                        elif "ARVAL" in p_upper: p_if_val = "500 Euro"
-                        elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: p_if_val = "10%"
-                        else: p_if_val = "10%"
-
-                        servizi = f"RCA 250 Euro | I/F {p_if_val} | Kasko 500 Euro | Manutenzione | Soccorso{gomme_str}"
-                        
-                        veicolo = f"{p['marca']} {p['modello']}"[:42]
-                        mesi_km = f"{p['durata']}m / {p['km']}km"
-                        anticipo = f"Euro {str(p['anticipo']).replace('.0','')}"
-                        canone = f"Euro {str(p['canone']).replace('.0','')}"
-
-                        pdf.set_font(pdf.f_f, "B", 9)
-                        pdf.cell(w_vei, 10, f" {pulisci_testo(veicolo)}", border=1)
-                        pdf.set_font(pdf.f_f, "", 9)
-                        pdf.cell(w_mesi, 10, pulisci_testo(mesi_km), border=1, align="C")
-                        pdf.cell(w_ant, 10, pulisci_testo(anticipo), border=1, align="C")
-                        pdf.set_text_color(201, 188, 65)
-                        pdf.set_font(pdf.f_f, "B", 10)
-                        pdf.cell(w_can, 10, pulisci_testo(canone), border=1, align="C")
-                        pdf.set_text_color(255, 255, 255)
-                        pdf.set_font(pdf.f_f, "", 8)
-                        pdf.cell(w_serv, 10, f" {pulisci_testo(servizi)}", border=1)
-                        pdf.ln()
-
-                    pdf.ln(10)
-                    pdf.set_font(pdf.f_f, "I", 8)
-                    pdf.set_text_color(180, 180, 180)
-                    pdf.cell(0, 4, "*Canone non comprende tassa automobilistica. Validita' offerta: 30gg.", align="L", ln=True)
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.set_font(pdf.f_f, "B", 9)
-                    pdf.cell(0, 5, f"Consulente: {utente_loggato['nome'].upper()} | Tel: {utente_loggato['tel']} | E-mail: {utente_loggato['email']}", align="L", ln=True)
-                    
-                    pdf.output("Fascicolo_Offerte.pdf")
-                    st.session_state["pdf_carrello_pronto"] = True
-
-            with col_cart3:
-                st.write("")
-                st.write("")
-                if st.button("🗑️ Svuota Carrello"):
-                    st.session_state["lista_fascicolo"] = []
-                    st.session_state["pdf_carrello_pronto"] = False
-                    st.rerun()
-            
-            # MOSTRA TASTO DOWNLOAD E CUORICINI
-            if st.session_state.get("pdf_carrello_pronto"):
-                show_hearts() # Pioggia di cuori!
-                with open("Fascicolo_Offerte.pdf", "rb") as f:
-                    st.download_button("📩 IL PDF E' PRONTO: SCARICA ORA!", f, "Fascicolo_Offerte.pdf", "application/pdf")
-                    
-            st.markdown("---")
-
-
         st.title("🔥 Promozioni del Mese")
         st.markdown("Sfoglia le offerte, verifica i dettagli e trasferiscile nel preventivatore con un clic.")
         
@@ -443,15 +282,21 @@ if check_password():
                 df_promo.columns = df_promo.columns.str.strip()
                 df_promo = df_promo.fillna("") 
                 
-                c_search, c_alimen = st.columns([2, 1])
+                c_search, c_alimen, c_player = st.columns([2, 1, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
-                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
+                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
                     else:
                         filtro_alimen = "Tutte"
+                with c_player:
+                    if 'PLAYER' in df_promo.columns:
+                        lista_player = ["Tutti"] + sorted([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])
+                        filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
+                    else:
+                        filtro_player = "Tutti"
                 
                 st.markdown("---")
                 offerte_filtrate = []
@@ -476,6 +321,7 @@ if check_password():
 
                     if ricerca and ricerca not in marca and ricerca not in modello.upper(): continue
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
+                    if filtro_player != "Tutti" and player != filtro_player: continue
                         
                     offerte_filtrate.append({
                         "marca": marca, "modello": modello, "canone": canone, 
@@ -508,58 +354,46 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            c_btn1, c_btn2 = st.columns(2)
-                            
-                            with c_btn1:
-                                if st.button("➡️ Utilizza la Promo", key=f"btn_promo_{idx}"):
-                                    st.session_state["val_marca_stampa"] = auto['marca']
-                                    st.session_state["val_versione_stampa"] = auto['modello']
-                                    st.session_state["val_canone"] = float(auto['canone'])
-                                    st.session_state["val_anticipo"] = float(auto['anticipo'])
-                                    st.session_state["val_durata"] = auto['durata']
-                                    st.session_state["val_km"] = auto['km']
-                                    st.session_state["val_input_mode"] = "Testo Libero"
-                                    st.session_state["origine_preventivo"] = "Vetrina Promo" 
-                                    
-                                    p_upper = auto['player'].upper()
-                                    t_upper = auto['tipo'].upper()
-                                    st.session_state["val_p_rca"] = "250 Euro"
-                                    st.session_state["val_p_kasko"] = "500 Euro"
-                                    st.session_state["val_usa_gomme"] = False
-                                    st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+                            if st.button("➡️ Utilizza la Promo", key=f"btn_promo_{idx}"):
+                                st.session_state["val_marca_stampa"] = auto['marca']
+                                st.session_state["val_versione_stampa"] = auto['modello']
+                                st.session_state["val_canone"] = float(auto['canone'])
+                                st.session_state["val_anticipo"] = float(auto['anticipo'])
+                                st.session_state["val_durata"] = auto['durata']
+                                
+                                dur = auto['durata']
+                                st.session_state["val_km"] = int((auto['km'] / dur) * 12) if dur > 0 else auto['km']
+                                
+                                st.session_state["val_input_mode"] = "Testo Libero"
+                                st.session_state["origine_preventivo"] = "Vetrina Promo" 
+                                
+                                p_upper = auto['player'].upper()
+                                t_upper = auto['tipo'].upper()
+                                st.session_state["val_p_rca"] = "250 Euro"
+                                st.session_state["val_p_kasko"] = "500 Euro"
+                                st.session_state["val_usa_gomme"] = False
+                                st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+                                st.session_state["val_n_gomme"] = 4
+                                st.session_state["val_stagione_gomme"] = "Estive"
 
-                                    if "AYVENS" in p_upper:
-                                        if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
-                                            st.session_state["val_p_if"] = "0%"
-                                            st.session_state["val_usa_gomme"] = True
-                                            st.session_state["val_tipo_gomme"] = "INVERNALI"
-                                        else: 
-                                            st.session_state["val_p_if"] = "500 Euro"
-                                    elif "ARVAL" in p_upper: 
-                                        st.session_state["val_p_if"] = "500 Euro"
-                                    elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: 
-                                        st.session_state["val_p_if"] = "10%"
+                                if "AYVENS" in p_upper:
+                                    if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                        st.session_state["val_p_if"] = "0%"
+                                        st.session_state["val_usa_gomme"] = True
+                                        st.session_state["val_tipo_gomme"] = "A NUMERO"
+                                        st.session_state["val_n_gomme"] = 4
+                                        st.session_state["val_stagione_gomme"] = "Invernali"
                                     else: 
-                                        st.session_state["val_p_if"] = "10%"
+                                        st.session_state["val_p_if"] = "500 Euro"
+                                elif "ARVAL" in p_upper: 
+                                    st.session_state["val_p_if"] = "500 Euro"
+                                elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: 
+                                    st.session_state["val_p_if"] = "10%"
+                                else: 
+                                    st.session_state["val_p_if"] = "10%"
 
-                                    st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
-                                    st.rerun()
-
-                            with c_btn2:
-                                if st.button("🛒 Aggiungi al Carrello", key=f"btn_cart_{idx}"):
-                                    auto_carrello = {
-                                        "marca": auto['marca'],
-                                        "modello": auto['modello'],
-                                        "canone": auto['canone'],
-                                        "anticipo": auto['anticipo'],
-                                        "durata": auto['durata'],
-                                        "km": auto['km'],
-                                        "player": auto['player'],
-                                        "tipo": auto['tipo']
-                                    }
-                                    st.session_state["lista_fascicolo"].append(auto_carrello)
-                                    st.session_state["pdf_carrello_pronto"] = False # Reset PDF se aggiungi roba nuova
-                                    st.rerun()
+                                st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
+                                st.rerun()
 
             except Exception as e:
                 st.error(f"Errore lettura Excel: {str(e)}")
@@ -658,10 +492,6 @@ if check_password():
         
         g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
 
-        nome_cons = utente_loggato["nome"]
-        email_cons = utente_loggato["email"]
-        tel_cons = utente_loggato["tel"]
-
         c1, c2 = st.columns(2)
         with c1:
             st.subheader("👤 Cliente")
@@ -714,14 +544,30 @@ if check_password():
             usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", False))
             g_num = "ILLIMITATE"
             if usa_gomme:
-                opzioni_gomme = ["ILLIMITATE", "A NUMERO", "INVERNALI"]
-                idx_gomme = opzioni_gomme.index(st.session_state.get("val_tipo_gomme", "ILLIMITATE")) if st.session_state.get("val_tipo_gomme", "ILLIMITATE") in opzioni_gomme else 0
+                opzioni_gomme = ["ILLIMITATE", "A NUMERO"]
+                idx_gomme = 0 if st.session_state.get("val_tipo_gomme", "ILLIMITATE") == "ILLIMITATE" else 1
                 g_tipo = st.radio("Tipo Gomme", opzioni_gomme, horizontal=True, index=idx_gomme)
+                
                 if g_tipo == "A NUMERO":
-                    g_num = st.number_input("N. Gomme", value=4, min_value=1)
-                elif g_tipo == "INVERNALI":
-                    g_num = "INVERNALI"
-            else: g_num = None
+                    c_g1, c_g2 = st.columns([1, 2])
+                    with c_g1:
+                        n_gomme = st.number_input("Numero", value=st.session_state.get("val_n_gomme", 4), min_value=1)
+                    with c_g2:
+                        stag_opts = ["Estive", "Invernali", "All Season"]
+                        try: stag_idx = stag_opts.index(st.session_state.get("val_stagione_gomme", "Estive"))
+                        except ValueError: stag_idx = 0
+                        stagione_gomme = st.selectbox("Stagione", stag_opts, index=stag_idx)
+                        
+                    g_num = f"{n_gomme} {stagione_gomme}"
+                    st.session_state["val_tipo_gomme"] = "A NUMERO"
+                    st.session_state["val_n_gomme"] = n_gomme
+                    st.session_state["val_stagione_gomme"] = stagione_gomme
+                else:
+                    g_num = "ILLIMITATE"
+                    st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+            else: 
+                g_num = None
+                st.session_state["val_usa_gomme"] = False
 
         st.markdown("---")
         st.subheader("💸 Dati Economici")
@@ -789,10 +635,18 @@ if check_password():
                         
                         pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
                         pdf.set_font(pdf.f_f, "", 9)
-                        serv_list = [f"RCA ({p['p_rca']})", f"I/F ({p['p_if']})", f"Kasko ({p['p_kasko']})", "Manutenzione", "Soccorso H24"]
+                        
+                        serv_list = [
+                            f"RCA (Franchigia {p['p_rca']})", 
+                            f"Incendio/Furto (Franchigia {p['p_if']})", 
+                            f"Danni/Kasko (Franchigia {p['p_kasko']})", 
+                            "Manutenzione Ordinaria/Straordinaria", 
+                            "Assistenza Stradale H24"
+                        ]
                         if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
-                        if p.get('infort'): serv_list.append("PAI")
-                        if p.get('vett_sost'): serv_list.append(f"Auto Sost. ({p['vett_sost']})")
+                        if p.get('infort'): serv_list.append("Infortunio Conducente (PAI)")
+                        if p.get('vett_sost'): serv_list.append(f"Vettura Sostitutiva ({p['vett_sost']})")
+                        
                         pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
 
                         if p.get('opt'):
