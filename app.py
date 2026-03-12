@@ -31,7 +31,7 @@ def scarica_foto_auto_api(marca, versione):
     GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
     GOOGLE_CX = "419da089f0736400f"
     
-    if GOOGLE_API_KEY == "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI":
+    if GOOGLE_API_KEY == "inserisci qui la tua chiave api":
         st.warning("⚠️ Diagnostica: Inserisci le chiavi di Google nel codice.")
         return None
 
@@ -593,5 +593,6 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
+
 
 
