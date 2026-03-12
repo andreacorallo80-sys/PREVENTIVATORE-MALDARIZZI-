@@ -177,6 +177,8 @@ if "val_opt" not in st.session_state: st.session_state["val_opt"] = ""
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
+if "val_usa_gomme" not in st.session_state: st.session_state["val_usa_gomme"] = False
+if "val_tipo_gomme" not in st.session_state: st.session_state["val_tipo_gomme"] = "ILLIMITATE"
 if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
@@ -275,22 +277,15 @@ if check_password():
                 df_promo.columns = df_promo.columns.str.strip()
                 df_promo = df_promo.fillna("") 
                 
-                # --- AGGIUNTO IL FILTRO PER SOCIETA' DI NOLEGGIO (PLAYER) ---
-                c_search, c_alimen, c_player = st.columns([2, 1, 1])
+                c_search, c_alimen = st.columns([2, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
-                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])
+                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
                     else:
                         filtro_alimen = "Tutte"
-                with c_player:
-                    if 'PLAYER' in df_promo.columns:
-                        lista_player = ["Tutti"] + sorted([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])
-                        filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
-                    else:
-                        filtro_player = "Tutti"
                 
                 st.markdown("---")
                 offerte_filtrate = []
@@ -315,7 +310,6 @@ if check_password():
 
                     if ricerca and ricerca not in marca and ricerca not in modello.upper(): continue
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
-                    if filtro_player != "Tutti" and player != filtro_player: continue # Esclude se non combacia il player scelto
                         
                     offerte_filtrate.append({
                         "marca": marca, "modello": modello, "canone": canone, 
@@ -323,9 +317,9 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
-                # --- ORDINAMENTO DELLE OFFERTE DAL CANONE PIÙ BASSO AL PIÙ ALTO ---
+                # --- ORDINAMENTO DELLE OFFERTE (Dal canone più basso al più alto) ---
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
-                
+
                 if not offerte_filtrate:
                     st.warning("Nessuna offerta trovata con questi parametri.")
                 else:
@@ -349,7 +343,8 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            if st.button(f"➡️ Usa Promo {auto['marca']}", key=f"btn_promo_{idx}"):
+                            # --- MODIFICA BOTTONE E TRASLAZIONE SERVIZI ---
+                            if st.button("➡️ Utilizza la Promo", key=f"btn_promo_{idx}"):
                                 st.session_state["val_marca_stampa"] = auto['marca']
                                 st.session_state["val_versione_stampa"] = auto['modello']
                                 st.session_state["val_canone"] = float(auto['canone'])
@@ -358,6 +353,30 @@ if check_password():
                                 st.session_state["val_km"] = auto['km']
                                 st.session_state["val_input_mode"] = "Testo Libero"
                                 st.session_state["origine_preventivo"] = "Vetrina Promo" 
+                                
+                                # Logica Intelligente per impostare automaticamente Franchigie e Gomme
+                                p_upper = auto['player'].upper()
+                                t_upper = auto['tipo'].upper()
+                                
+                                st.session_state["val_p_rca"] = "250 Euro"
+                                st.session_state["val_p_kasko"] = "500 Euro"
+                                st.session_state["val_usa_gomme"] = False
+                                st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+
+                                if "AYVENS" in p_upper:
+                                    if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                        st.session_state["val_p_if"] = "0%"
+                                        st.session_state["val_usa_gomme"] = True
+                                        st.session_state["val_tipo_gomme"] = "INVERNALI"
+                                    else: 
+                                        st.session_state["val_p_if"] = "500 Euro"
+                                elif "ARVAL" in p_upper: 
+                                    st.session_state["val_p_if"] = "500 Euro"
+                                elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: 
+                                    st.session_state["val_p_if"] = "10%"
+                                else: 
+                                    st.session_state["val_p_if"] = "10%"
+
                                 st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
                                 st.rerun()
             except Exception as e:
@@ -510,12 +529,19 @@ if check_password():
             vett_sost_cat = st.selectbox("Categoria Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY"]) if usa_vett_sost else None
         
         with s3:
-            usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
+            usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", False))
             g_num = "ILLIMITATE"
             if usa_gomme:
-                if st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True) == "A NUMERO":
+                opzioni_gomme = ["ILLIMITATE", "A NUMERO", "INVERNALI"]
+                idx_gomme = opzioni_gomme.index(st.session_state.get("val_tipo_gomme", "ILLIMITATE")) if st.session_state.get("val_tipo_gomme", "ILLIMITATE") in opzioni_gomme else 0
+                g_tipo = st.radio("Tipo Gomme", opzioni_gomme, horizontal=True, index=idx_gomme)
+                
+                if g_tipo == "A NUMERO":
                     g_num = st.number_input("N. Gomme", value=4, min_value=1)
-            else: g_num = None
+                elif g_tipo == "INVERNALI":
+                    g_num = "INVERNALI"
+            else: 
+                g_num = None
 
         st.markdown("---")
         st.subheader("💸 Dati Economici")
@@ -604,4 +630,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
-
