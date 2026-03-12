@@ -8,6 +8,7 @@ import requests
 from fpdf import FPDF
 from datetime import datetime
 import locale
+import random
 
 # --- CREAZIONE CARTELLA CACHE PER RISPARMIARE CHIAMATE ---
 if not os.path.exists("Foto_Cache"):
@@ -24,6 +25,30 @@ def pulisci_testo(testo):
     for k, v in sostituzioni.items():
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
+
+# --- FUNZIONE EFFETTO CUORICINI ---
+def show_hearts():
+    hearts_html = """
+    <style>
+    @keyframes heart-fall { 
+        0% {top: -10%; opacity: 1; transform: rotate(0deg);} 
+        100% {top: 100%; opacity: 0; transform: rotate(360deg);} 
+    } 
+    .heart {
+        position: fixed; 
+        font-size: 2.5rem; 
+        color: #e74c3c; 
+        z-index: 9999; 
+        animation: heart-fall linear forwards;
+    }
+    </style>
+    """
+    for _ in range(40):
+        left = random.randint(0, 100)
+        delay = random.uniform(0, 2.5)
+        duration = random.uniform(2.5, 4.5)
+        hearts_html += f"<div class='heart' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>❤️</div>"
+    st.markdown(hearts_html, unsafe_allow_html=True)
 
 # --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI (GRATIS) ---
 def scarica_foto_auto_api(marca, versione):
@@ -164,8 +189,8 @@ def check_password():
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
-# Variabile per il nuovo Carrello delle Promozioni:
 if "lista_fascicolo" not in st.session_state: st.session_state["lista_fascicolo"] = [] 
+if "pdf_carrello_pronto" not in st.session_state: st.session_state["pdf_carrello_pronto"] = False
 
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
@@ -184,7 +209,7 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
-# --- 2. CLASSE PDF ---
+# --- 2. CLASSE PDF PREVENTIVATORE (VERTICALE) ---
 class MaldarizziPDF(FPDF):
     def __init__(self):
         super().__init__()
@@ -215,6 +240,41 @@ class MaldarizziPDF(FPDF):
         if os.path.exists("logo.png"):
             try:
                 self.image("logo.png", 145, 275, 55)
+            except Exception: pass
+
+# --- 3. NUOVA CLASSE PDF CARRELLO (ORIZZONTALE) ---
+class FascicoloPDF(FPDF):
+    def __init__(self):
+        super().__init__(orientation='L', unit='mm', format='A4') 
+        self.set_margins(10, 10, 10)
+        self.set_auto_page_break(True, margin=15)
+        if os.path.exists("Rubik-Light.ttf"):
+            self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
+        if os.path.exists("Rubik-Bold.ttf"):
+            self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
+        self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
+
+    def header(self):
+        # Punta allo sfondo orizzontale richiesto
+        if os.path.exists("sfondo nero orizz.jpg"):
+            try:
+                self.image("sfondo nero orizz.jpg", 0, 0, 297, 210)
+            except Exception:
+                self.set_fill_color(20, 20, 20)
+                self.rect(0, 0, 297, 210, 'F')
+        elif os.path.exists("sfondo_nero.jpg"):
+            try:
+                self.image("sfondo_nero.jpg", 0, 0, 297, 210)
+            except Exception:
+                self.set_fill_color(20, 20, 20)
+                self.rect(0, 0, 297, 210, 'F')
+        else:
+            self.set_fill_color(20, 20, 20)
+            self.rect(0, 0, 297, 210, 'F')
+
+        if os.path.exists("logo.png"):
+            try:
+                self.image("logo.png", 10, 10, 45) 
             except Exception: pass
 
 # ==========================================
@@ -264,21 +324,107 @@ if check_password():
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
         
-        # --- UI DEL CARRELLO PROMO ---
+        # --- UI DEL CARRELLO PROMO (IN ALTO) ---
         if len(st.session_state["lista_fascicolo"]) > 0:
             st.info(f"🛒 **CARRELLO OFFERTE:** Hai {len(st.session_state['lista_fascicolo'])} promozioni selezionate.")
-            col_cart1, col_cart2 = st.columns([3, 1])
+            col_cart1, col_cart2, col_cart3 = st.columns([2, 1, 1])
             with col_cart1:
-                # Campo per intestare il carrello al cliente
                 cliente_carrello = st.text_input("👤 Intesta queste offerte a (Nome Cliente):", value=st.session_state.get("val_cliente", "Gentile CLIENTE"))
-                if cliente_carrello:
-                    st.session_state["val_cliente"] = cliente_carrello
+                st.session_state["val_cliente"] = cliente_carrello
+            
             with col_cart2:
-                st.write("") # Spaziatura visiva per allineare il bottone
+                st.write("") 
+                st.write("")
+                if st.button("🚀 GENERA STAMPA CARRELLO"):
+                    pdf = FascicoloPDF()
+                    pdf.add_page()
+                    
+                    pdf.set_y(35)
+                    pdf.set_font(pdf.f_f, "B", 18)
+                    pdf.set_text_color(201, 188, 65)
+                    pdf.cell(0, 10, "FASCICOLO OFFERTE COMMERCIALI", align="C", ln=True)
+                    
+                    pdf.set_font(pdf.f_f, "", 12)
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.cell(0, 8, f"Spett.le: {pulisci_testo(st.session_state['val_cliente'].upper())}", align="C", ln=True)
+                    pdf.ln(10)
+
+                    # INTESTAZIONE TABELLA GRIGLIA
+                    pdf.set_font(pdf.f_f, "B", 10)
+                    pdf.set_fill_color(50, 50, 50)
+                    pdf.set_text_color(201, 188, 65)
+                    w_vei, w_mesi, w_ant, w_can, w_serv = 70, 30, 25, 25, 127
+                    
+                    pdf.cell(w_vei, 10, " MARCA E MODELLO", border=1, fill=True)
+                    pdf.cell(w_mesi, 10, " MESI / KM", border=1, align="C", fill=True)
+                    pdf.cell(w_ant, 10, " ANTICIPO", border=1, align="C", fill=True)
+                    pdf.cell(w_can, 10, " CANONE", border=1, align="C", fill=True)
+                    pdf.cell(w_serv, 10, " PENALI E SERVIZI INCLUSI", border=1, fill=True)
+                    pdf.ln()
+
+                    # RIGHE
+                    pdf.set_text_color(255, 255, 255)
+                    for p in st.session_state["lista_fascicolo"]:
+                        # Logica Franchigie per la stampa
+                        p_upper = str(p['player']).upper()
+                        t_upper = str(p['tipo']).upper()
+                        p_if_val = "10%"
+                        gomme_str = ""
+                        
+                        if "AYVENS" in p_upper:
+                            if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                p_if_val = "0%"
+                                gomme_str = " | Gomme Invernali"
+                            else: p_if_val = "500 Euro"
+                        elif "ARVAL" in p_upper: p_if_val = "500 Euro"
+                        elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: p_if_val = "10%"
+                        else: p_if_val = "10%"
+
+                        servizi = f"RCA 250 Euro | I/F {p_if_val} | Kasko 500 Euro | Manutenzione | Soccorso{gomme_str}"
+                        
+                        veicolo = f"{p['marca']} {p['modello']}"[:42]
+                        mesi_km = f"{p['durata']}m / {p['km']}km"
+                        anticipo = f"Euro {str(p['anticipo']).replace('.0','')}"
+                        canone = f"Euro {str(p['canone']).replace('.0','')}"
+
+                        pdf.set_font(pdf.f_f, "B", 9)
+                        pdf.cell(w_vei, 10, f" {pulisci_testo(veicolo)}", border=1)
+                        pdf.set_font(pdf.f_f, "", 9)
+                        pdf.cell(w_mesi, 10, pulisci_testo(mesi_km), border=1, align="C")
+                        pdf.cell(w_ant, 10, pulisci_testo(anticipo), border=1, align="C")
+                        pdf.set_text_color(201, 188, 65)
+                        pdf.set_font(pdf.f_f, "B", 10)
+                        pdf.cell(w_can, 10, pulisci_testo(canone), border=1, align="C")
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.set_font(pdf.f_f, "", 8)
+                        pdf.cell(w_serv, 10, f" {pulisci_testo(servizi)}", border=1)
+                        pdf.ln()
+
+                    pdf.ln(10)
+                    pdf.set_font(pdf.f_f, "I", 8)
+                    pdf.set_text_color(180, 180, 180)
+                    pdf.cell(0, 4, "*Canone non comprende tassa automobilistica. Validita' offerta: 30gg.", align="L", ln=True)
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.set_font(pdf.f_f, "B", 9)
+                    pdf.cell(0, 5, f"Consulente: {utente_loggato['nome'].upper()} | Tel: {utente_loggato['tel']} | E-mail: {utente_loggato['email']}", align="L", ln=True)
+                    
+                    pdf.output("Fascicolo_Offerte.pdf")
+                    st.session_state["pdf_carrello_pronto"] = True
+
+            with col_cart3:
+                st.write("")
                 st.write("")
                 if st.button("🗑️ Svuota Carrello"):
                     st.session_state["lista_fascicolo"] = []
+                    st.session_state["pdf_carrello_pronto"] = False
                     st.rerun()
+            
+            # MOSTRA TASTO DOWNLOAD E CUORICINI
+            if st.session_state.get("pdf_carrello_pronto"):
+                show_hearts() # Pioggia di cuori!
+                with open("Fascicolo_Offerte.pdf", "rb") as f:
+                    st.download_button("📩 IL PDF E' PRONTO: SCARICA ORA!", f, "Fascicolo_Offerte.pdf", "application/pdf")
+                    
             st.markdown("---")
 
 
@@ -337,7 +483,6 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
-                # --- ORDINAMENTO OFFERTE ---
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
 
                 if not offerte_filtrate:
@@ -363,7 +508,6 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # --- PULSANTI SEPARATI ---
                             c_btn1, c_btn2 = st.columns(2)
                             
                             with c_btn1:
@@ -377,7 +521,6 @@ if check_password():
                                     st.session_state["val_input_mode"] = "Testo Libero"
                                     st.session_state["origine_preventivo"] = "Vetrina Promo" 
                                     
-                                    # Impostazioni Logiche per la traslazione
                                     p_upper = auto['player'].upper()
                                     t_upper = auto['tipo'].upper()
                                     st.session_state["val_p_rca"] = "250 Euro"
@@ -415,6 +558,7 @@ if check_password():
                                         "tipo": auto['tipo']
                                     }
                                     st.session_state["lista_fascicolo"].append(auto_carrello)
+                                    st.session_state["pdf_carrello_pronto"] = False # Reset PDF se aggiungi roba nuova
                                     st.rerun()
 
             except Exception as e:
@@ -567,11 +711,16 @@ if check_password():
             vett_sost_cat = st.selectbox("Categoria Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY"]) if usa_vett_sost else None
         
         with s3:
-            usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
+            usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", False))
             g_num = "ILLIMITATE"
             if usa_gomme:
-                if st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True) == "A NUMERO":
+                opzioni_gomme = ["ILLIMITATE", "A NUMERO", "INVERNALI"]
+                idx_gomme = opzioni_gomme.index(st.session_state.get("val_tipo_gomme", "ILLIMITATE")) if st.session_state.get("val_tipo_gomme", "ILLIMITATE") in opzioni_gomme else 0
+                g_tipo = st.radio("Tipo Gomme", opzioni_gomme, horizontal=True, index=idx_gomme)
+                if g_tipo == "A NUMERO":
                     g_num = st.number_input("N. Gomme", value=4, min_value=1)
+                elif g_tipo == "INVERNALI":
+                    g_num = "INVERNALI"
             else: g_num = None
 
         st.markdown("---")
