@@ -678,3 +678,4 @@ if check_password():
             st.session_state["lista_preventivi"].append(auto_aggiunta)
             st.success(f"✅ Veicolo aggiunto! Puoi stampare dal menù laterale a sinistra.")
             st.rerun()
+
