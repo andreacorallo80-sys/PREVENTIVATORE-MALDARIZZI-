@@ -25,7 +25,7 @@ def pulisci_testo(testo):
         testo = testo.replace(k, v)
     return testo.encode('latin-1', 'ignore').decode('latin-1')
 
-# --- MOTORE FOTO (ATTUALMENTE SU GOOGLE) ---
+# --- MOTORE FOTO (GOOGLE + CACHE) ---
 def scarica_foto_auto_api(marca, versione):
     GOOGLE_API_KEY = "INSERISCI_QUI_LA_API_KEY_DI_GOOGLE"
     GOOGLE_CX = "INSERISCI_QUI_IL_CX_DI_GOOGLE"
@@ -221,13 +221,22 @@ if check_password():
                 df_promo.columns = df_promo.columns.str.strip()
                 df_promo = df_promo.fillna("") 
                 
-                c_search, c_alimen = st.columns([2, 1])
-                with c_search: ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
+                # AGGIUNTA FILTRO SOCIETÀ DI NOLEGGIO (PLAYER)
+                c_search, c_alimen, c_player = st.columns([2, 1, 1])
+                with c_search: 
+                    ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
-                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
+                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
-                    else: filtro_alimen = "Tutte"
+                    else: 
+                        filtro_alimen = "Tutte"
+                with c_player:
+                    if 'PLAYER' in df_promo.columns:
+                        lista_player = ["Tutti"] + sorted([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])
+                        filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
+                    else:
+                        filtro_player = "Tutti"
                 
                 st.markdown("---")
                 offerte_filtrate = []
@@ -252,10 +261,11 @@ if check_password():
 
                     if ricerca and ricerca not in marca and ricerca not in modello.upper(): continue
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
+                    if filtro_player != "Tutti" and player != filtro_player: continue
                         
                     offerte_filtrate.append({
                         "marca": marca, "modello": modello, "canone": canone, 
-                        "anticipo": anticipo, "durata": mesi, "km": km,
+                        "anticipo": anticipo, "durata": mesi, "km_totali": km,
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
@@ -273,7 +283,7 @@ if check_password():
                                 <h5 style="margin-top: 0; color: #AAA;">{auto['modello']}</h5>
                                 <h1 style="color: #C9BC41; margin-bottom: 5px;">€ {auto['canone']}<span style="font-size: 14px; color: #888;"> /mese</span></h1>
                                 <p style="color: #DDD; font-size: 14px; margin-bottom: 10px;">
-                                    ⏳ {auto['durata']} mesi | 🛣️ {auto['km']} Km totali<br>
+                                    ⏳ {auto['durata']} mesi | 🛣️ {auto['km_totali']} Km totali<br>
                                     💰 Anticipo: € {auto['anticipo']}
                                 </p>
                                 <hr style="border-top: 1px solid #444; margin: 10px 0;">
@@ -289,11 +299,18 @@ if check_password():
                                 st.session_state["val_canone"] = float(auto['canone'])
                                 st.session_state["val_anticipo"] = float(auto['anticipo'])
                                 st.session_state["val_durata"] = auto['durata']
-                                st.session_state["val_km"] = auto['km']
                                 st.session_state["val_input_mode"] = "Testo Libero"
                                 st.session_state["origine_preventivo"] = "Vetrina Promo" 
                                 
-                                # SETTAGGIO AUTOMATICO FRANCHIGIE E SERVIZI (DA TABELLA EXCEL)
+                                # 🧮 CALCOLO AUTOMATICO KM/ANNO (Dividendo per i mesi e moltiplicando per 12)
+                                km_t = auto['km_totali']
+                                dur = auto['durata']
+                                if dur > 0:
+                                    st.session_state["val_km"] = int((km_t / dur) * 12)
+                                else:
+                                    st.session_state["val_km"] = km_t
+                                
+                                # ⚙️ SETTAGGIO AUTOMATICO FRANCHIGIE E SERVIZI (DA TABELLA EXCEL)
                                 p_upper = auto['player'].upper()
                                 t_upper = auto['tipo'].upper()
                                 
@@ -303,7 +320,7 @@ if check_password():
                                 st.session_state["val_usa_gomme"] = False
                                 st.session_state["val_tipo_gomme"] = "ILLIMITATE"
 
-                                # Analisi Specifica
+                                # Analisi Specifica per "Furto/Incendio" e "Gomme"
                                 if "AYVENS" in p_upper:
                                     if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
                                         st.session_state["val_p_if"] = "0%"
@@ -470,7 +487,6 @@ if check_password():
             vett_sost_cat = st.selectbox("Categoria Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY"]) if usa_vett_sost else None
         
         with s3:
-            # LETTURA AUTOMATICA DELLE GOMME
             usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", True))
             g_num = "ILLIMITATE"
             if usa_gomme:
