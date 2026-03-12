@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 import re
@@ -13,7 +13,7 @@ import locale
 if not os.path.exists("Foto_Cache"):
     os.makedirs("Foto_Cache")
 
-# --- HELPER LETTURA FILE (Risolve problemi di virgole, punti e virgola o spazi) ---
+# --- HELPER LETTURA FILE ---
 def leggi_file_dati(percorso):
     if percorso.endswith(".csv"):
         try:
@@ -135,7 +135,8 @@ def check_password():
 
 # --- INIZIALIZZAZIONE VARIABILI IN MEMORIA ---
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
-if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
+if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = [] # Per il Preventivatore (Verticale)
+if "lista_fascicolo" not in st.session_state: st.session_state["lista_fascicolo"] = [] # Per le Promo (Orizzontale)
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
 if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
@@ -154,10 +155,31 @@ if "val_tipo_gomme" not in st.session_state: st.session_state["val_tipo_gomme"] 
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
-# --- 2. CLASSE PDF FASCICOLO (LAYOUT GRIGLIA ORIZZONTALE) ---
+# --- CLASSE PDF 1: PREVENTIVO VERTICALE (Per il Preventivatore) ---
+class MaldarizziPDF(FPDF):
+    def __init__(self):
+        super().__init__(orientation='P', unit='mm', format='A4') 
+        self.set_margins(10, 10, 10)
+        self.set_auto_page_break(False)
+        if os.path.exists("Rubik-Light.ttf"): self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
+        if os.path.exists("Rubik-Bold.ttf"): self.add_font("Rubik", "B", "Rubik-Bold.ttf", uni=True)
+        self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
+
+    def header(self):
+        if os.path.exists("sfondo_nero.jpg"):
+            try: self.image("sfondo_nero.jpg", 0, 0, 210, 297)
+            except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
+        else: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
+        if os.path.exists("logo.png"):
+            try: self.image("logo.png", 5, 5, 45) 
+            except Exception: pass
+            try: self.image("logo.png", 145, 275, 55)
+            except Exception: pass
+
+# --- CLASSE PDF 2: FASCICOLO ORIZZONTALE (Per le Promo) ---
 class FascicoloPDF(FPDF):
     def __init__(self):
-        super().__init__(orientation='L', unit='mm', format='A4') # 'L' = Landscape (Orizzontale)
+        super().__init__(orientation='L', unit='mm', format='A4') # L = Landscape
         self.set_margins(10, 10, 10)
         self.set_auto_page_break(True, margin=15)
         if os.path.exists("Rubik-Light.ttf"): self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
@@ -169,7 +191,6 @@ class FascicoloPDF(FPDF):
             try: self.image("sfondo_nero.jpg", 0, 0, 297, 210)
             except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 297, 210, 'F')
         else: self.set_fill_color(20, 20, 20); self.rect(0, 0, 297, 210, 'F')
-
         if os.path.exists("logo.png"):
             try: self.image("logo.png", 10, 10, 45) 
             except Exception: pass
@@ -211,101 +232,93 @@ if check_password():
         st.rerun()
         
     st.sidebar.markdown("---")
-    
-    # ==========================================
-    # CARRELLO E STAMPA FASCICOLO (GRIGLIA) NEL MENU LATERALE
-    # ==========================================
-    if len(st.session_state["lista_preventivi"]) > 0:
-        st.sidebar.info(f"🛒 **FASCICOLO PRONTO**\nHai **{len(st.session_state['lista_preventivi'])}** auto in lista.")
-        
-        # GENERAZIONE PDF FASCICOLO (GRIGLIA ORIZZONTALE)
-        pdf_fascicolo = FascicoloPDF()
-        pdf_fascicolo.add_page()
-        
-        # Titolo e Cliente
-        pdf_fascicolo.set_y(35)
-        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 18)
-        pdf_fascicolo.set_text_color(201, 188, 65)
-        pdf_fascicolo.cell(0, 10, "FASCICOLO OFFERTE COMMERCIALI", align="C", ln=True)
-        
-        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 12)
-        pdf_fascicolo.set_text_color(255, 255, 255)
-        cliente_nome = st.session_state.get("val_cliente", "Gentile Cliente").upper()
-        pdf_fascicolo.cell(0, 8, f"Spett.le: {pulisci_testo(cliente_nome)}", align="C", ln=True)
-        pdf_fascicolo.ln(10)
-
-        # INTESTAZIONE TABELLA GRIGLIA
-        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10)
-        pdf_fascicolo.set_fill_color(50, 50, 50)
-        pdf_fascicolo.set_text_color(201, 188, 65)
-        
-        w_vei, w_mesi, w_ant, w_can, w_serv = 70, 30, 25, 25, 127
-        
-        pdf_fascicolo.cell(w_vei, 10, " MARCA E MODELLO", border=1, fill=True)
-        pdf_fascicolo.cell(w_mesi, 10, " MESI / KM", border=1, align="C", fill=True)
-        pdf_fascicolo.cell(w_ant, 10, " ANTICIPO", border=1, align="C", fill=True)
-        pdf_fascicolo.cell(w_can, 10, " CANONE", border=1, align="C", fill=True)
-        pdf_fascicolo.cell(w_serv, 10, " SERVIZI INCLUSI", border=1, fill=True)
-        pdf_fascicolo.ln()
-
-        # RIGHE DELLA TABELLA
-        pdf_fascicolo.set_text_color(255, 255, 255)
-        for p in st.session_state["lista_preventivi"]:
-            veicolo = f"{p['marca']} {p['versione']}"[:42]
-            mesi_km = f"{p['durata']}m / {p['km']}km"
-            anticipo = f"Euro {str(p['anticipo']).replace('.0','')}"
-            canone = f"Euro {str(p['canone']).replace('.0','')}"
-            
-            serv_list = [f"RCA {p['p_rca']}", f"I/F {p['p_if']}", f"Kasko {p['p_kasko']}"]
-            if p.get('g_num'): serv_list.append(f"Gomme {p['g_num']}")
-            if p.get('vett_sost'): serv_list.append("Vett. Sost.")
-            servizi = " | ".join(serv_list)[:90]
-
-            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 9)
-            pdf_fascicolo.cell(w_vei, 10, f" {pulisci_testo(veicolo)}", border=1)
-            
-            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 9)
-            pdf_fascicolo.cell(w_mesi, 10, pulisci_testo(mesi_km), border=1, align="C")
-            pdf_fascicolo.cell(w_ant, 10, pulisci_testo(anticipo), border=1, align="C")
-            
-            pdf_fascicolo.set_text_color(201, 188, 65)
-            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10)
-            pdf_fascicolo.cell(w_can, 10, pulisci_testo(canone), border=1, align="C")
-            
-            pdf_fascicolo.set_text_color(255, 255, 255)
-            pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 8)
-            pdf_fascicolo.cell(w_serv, 10, f" {pulisci_testo(servizi)}", border=1)
-            pdf_fascicolo.ln()
-            
-        # PIE DI PAGINA
-        pdf_fascicolo.ln(10)
-        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "I", 8)
-        pdf_fascicolo.set_text_color(180, 180, 180)
-        pdf_fascicolo.cell(0, 4, "*Canone non comprende tassa automobilistica. Validita' offerta: 30gg.", align="L", ln=True)
-        pdf_fascicolo.set_text_color(255, 255, 255)
-        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 9)
-        pdf_fascicolo.cell(0, 5, f"Consulente: {nome_cons.upper()} | Tel: {tel_cons} | E-mail: {email_cons}", align="L", ln=True)
-        
-        pdf_fascicolo.output("preventivo_fascicolo_sidebar.pdf")
-        
-        with open("preventivo_fascicolo_sidebar.pdf", "rb") as f:
-            st.sidebar.download_button("📩 SCARICA FASCICOLO (GRIGLIA)", f, "Fascicolo_Offerte.pdf", "application/pdf")
-            
-        if st.sidebar.button("🗑️ Svuota Fascicolo"):
-            st.session_state["lista_preventivi"] = []
-            st.rerun()
-        st.sidebar.markdown("---")
-        
     if st.sidebar.button("🚪 Esci"):
         st.session_state["authenticated"] = False
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: VETRINA CON DOPPIO DATABASE
+    # SEZIONE 1: VETRINA PROMO E FASCICOLO ORIZZONTALE
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
+        
+        # --- CARRELLO FASCICOLO IN ALTO ---
+        if len(st.session_state["lista_fascicolo"]) > 0:
+            st.success(f"🛒 **FASCICOLO PRONTO:** Hai inserito **{len(st.session_state['lista_fascicolo'])}** auto per la stampa a griglia.")
+            col_f1, col_f2 = st.columns([2, 1])
+            with col_f1:
+                if st.button("🚀 STAMPA FASCICOLO (GRIGLIA ORIZZONTALE)"):
+                    pdf_fascicolo = FascicoloPDF()
+                    pdf_fascicolo.add_page()
+                    
+                    pdf_fascicolo.set_y(35)
+                    pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 18)
+                    pdf_fascicolo.set_text_color(201, 188, 65)
+                    pdf_fascicolo.cell(0, 10, "FASCICOLO OFFERTE COMMERCIALI", align="C", ln=True)
+                    
+                    pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 12)
+                    pdf_fascicolo.set_text_color(255, 255, 255)
+                    cliente_nome = st.session_state.get("val_cliente", "Gentile Cliente").upper()
+                    pdf_fascicolo.cell(0, 8, f"Spett.le: {pulisci_testo(cliente_nome)}", align="C", ln=True)
+                    pdf_fascicolo.ln(10)
+
+                    # INTESTAZIONE GRIGLIA
+                    pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10)
+                    pdf_fascicolo.set_fill_color(50, 50, 50)
+                    pdf_fascicolo.set_text_color(201, 188, 65)
+                    w_vei, w_mesi, w_ant, w_can, w_serv = 70, 30, 25, 25, 127
+                    pdf_fascicolo.cell(w_vei, 10, " MARCA E MODELLO", border=1, fill=True)
+                    pdf_fascicolo.cell(w_mesi, 10, " MESI / KM", border=1, align="C", fill=True)
+                    pdf_fascicolo.cell(w_ant, 10, " ANTICIPO", border=1, align="C", fill=True)
+                    pdf_fascicolo.cell(w_can, 10, " CANONE", border=1, align="C", fill=True)
+                    pdf_fascicolo.cell(w_serv, 10, " SERVIZI INCLUSI", border=1, fill=True)
+                    pdf_fascicolo.ln()
+
+                    # RIGHE
+                    pdf_fascicolo.set_text_color(255, 255, 255)
+                    for p in st.session_state["lista_fascicolo"]:
+                        registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], "Fascicolo Promo")
+                        veicolo = f"{p['marca']} {p['versione']}"[:42]
+                        mesi_km = f"{p['durata']}m / {p['km']}km"
+                        anticipo = f"Euro {str(p['anticipo']).replace('.0','')}"
+                        canone = f"Euro {str(p['canone']).replace('.0','')}"
+                        
+                        serv_list = [f"RCA {p['p_rca']}", f"I/F {p['p_if']}", f"Kasko {p['p_kasko']}"]
+                        if p.get('g_num'): serv_list.append(f"Gomme {p['g_num']}")
+                        if p.get('vett_sost'): serv_list.append("Vett. Sost.")
+                        servizi = " | ".join(serv_list)[:90]
+
+                        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 9)
+                        pdf_fascicolo.cell(w_vei, 10, f" {pulisci_testo(veicolo)}", border=1)
+                        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 9)
+                        pdf_fascicolo.cell(w_mesi, 10, pulisci_testo(mesi_km), border=1, align="C")
+                        pdf_fascicolo.cell(w_ant, 10, pulisci_testo(anticipo), border=1, align="C")
+                        pdf_fascicolo.set_text_color(201, 188, 65)
+                        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10)
+                        pdf_fascicolo.cell(w_can, 10, pulisci_testo(canone), border=1, align="C")
+                        pdf_fascicolo.set_text_color(255, 255, 255)
+                        pdf_fascicolo.set_font(pdf_fascicolo.f_f, "", 8)
+                        pdf_fascicolo.cell(w_serv, 10, f" {pulisci_testo(servizi)}", border=1)
+                        pdf_fascicolo.ln()
+                        
+                    pdf_fascicolo.ln(10)
+                    pdf_fascicolo.set_font(pdf_fascicolo.f_f, "I", 8)
+                    pdf_fascicolo.set_text_color(180, 180, 180)
+                    pdf_fascicolo.cell(0, 4, "*Canone non comprende tassa automobilistica. Validita' offerta: 30gg.", align="L", ln=True)
+                    pdf_fascicolo.set_text_color(255, 255, 255)
+                    pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 9)
+                    pdf_fascicolo.cell(0, 5, f"Consulente: {nome_cons.upper()} | Tel: {tel_cons} | E-mail: {email_cons}", align="L", ln=True)
+                    
+                    pdf_fascicolo.output("Fascicolo_Offerte.pdf")
+                    with open("Fascicolo_Offerte.pdf", "rb") as f:
+                        st.download_button("📩 SCARICA FASCICOLO (PDF)", f, "Fascicolo_Offerte.pdf", "application/pdf")
+            with col_f2:
+                if st.button("🗑️ Svuota Fascicolo"):
+                    st.session_state["lista_fascicolo"] = []
+                    st.rerun()
+            st.markdown("---")
+
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le offerte. Puoi personalizzarle nel preventivatore o aggiungerle direttamente al Fascicolo!")
+        st.markdown("Sfoglia le offerte ordinate dal prezzo più basso. Personalizzale o aggiungile al Fascicolo!")
         
         with st.sidebar.expander("📥 CARICAMENTO DATABASE PROMO", expanded=False):
             file_promo = st.file_uploader("1. Database Generico", type=["xlsx", "csv"], key="file1")
@@ -333,7 +346,7 @@ if check_password():
                 df_4v.columns = df_4v.columns.str.strip().str.upper()
                 
                 # Traduttore universale per le colonne del 4Vantage
-                df_4v = df_4v.rename(columns={'MARCHIO': 'MARCA', 'KMS': 'KM TOTALI', 'COMMISSIONE': 'COMMISSIONI'})
+                df_4v = df_4v.rename(columns={'MARCHIO': 'MARCA', 'KMS': 'KM TOTALI', 'COMMISSIONE ': 'COMMISSIONI', 'COMMISSIONE': 'COMMISSIONI'})
                 df_4v['OFFERTA'] = "4VANTAGE"
                 if 'PLAYER' not in df_4v.columns: df_4v['PLAYER'] = "AYVENS"
                 
@@ -459,46 +472,42 @@ if check_password():
                                     st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
                                     st.rerun()
                                     
-                            # 2. TASTO AGGIUNGI AL FASCICOLO RAPIDO
+                            # 2. TASTO AGGIUNGI AL FASCICOLO
                             with c_btn2:
                                 if st.button(f"➕ Fascicolo", key=f"btn_fasc_{idx}"):
-                                    with st.spinner("Aggiunta al fascicolo..."):
-                                        dur = auto['durata']
-                                        km_anno = int((auto['km_totali'] / dur) * 12) if dur > 0 else auto['km_totali']
-                                        
-                                        p_upper = auto['player'].upper()
-                                        t_upper = auto['tipo'].upper()
-                                        p_if_val = "10%"
-                                        gomme_val = None
-                                        
-                                        if "AYVENS" in p_upper:
-                                            if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
-                                                p_if_val = "0%"
-                                                gomme_val = "INVERNALI"
-                                            else: p_if_val = "500 Euro"
-                                        elif "ARVAL" in p_upper: p_if_val = "500 Euro"
-                                        elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: p_if_val = "10%"
-                                        
-                                        foto_bytes_api = scarica_foto_auto_api(auto['marca'], auto['modello'])
-                                        
-                                        auto_aggiunta = {
-                                            "cliente": st.session_state.get("val_cliente", "Gentile CLIENTE"),
-                                            "consegna": "IN SEDE MALDARIZZI", 
-                                            "t_veicolo": "Nuovo", 
-                                            "note": "", "opt": "", 
-                                            "marca": pulisci_testo(auto['marca']), 
-                                            "versione": pulisci_testo(auto['modello']), 
-                                            "foto_bytes": foto_bytes_api, 
-                                            "p_rca": "250 Euro", "p_if": p_if_val, "p_kasko": "500 Euro", 
-                                            "infort": True, "g_num": gomme_val,
-                                            "vett_sost": None, "canone": float(auto['canone']), 
-                                            "anticipo": float(auto['anticipo']), "durata": dur, 
-                                            "km": km_anno, "iva_text": "Iva Esclusa", 
-                                            "origine_dati": "Fascicolo Rapido" 
-                                        }
-                                        st.session_state["lista_preventivi"].append(auto_aggiunta)
-                                        st.success(f"✅ {auto['marca']} aggiunta al Fascicolo!")
-                                        st.rerun() 
+                                    dur = auto['durata']
+                                    km_anno = int((auto['km_totali'] / dur) * 12) if dur > 0 else auto['km_totali']
+                                    
+                                    p_upper = auto['player'].upper()
+                                    t_upper = auto['tipo'].upper()
+                                    p_if_val = "10%"
+                                    gomme_val = None
+                                    
+                                    if "AYVENS" in p_upper:
+                                        if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                            p_if_val = "0%"
+                                            gomme_val = "INVERNALI"
+                                        else: p_if_val = "500 Euro"
+                                    elif "ARVAL" in p_upper: p_if_val = "500 Euro"
+                                    elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: p_if_val = "10%"
+                                    
+                                    auto_aggiunta = {
+                                        "cliente": st.session_state.get("val_cliente", "Gentile CLIENTE"),
+                                        "consegna": "IN SEDE MALDARIZZI", 
+                                        "t_veicolo": "Nuovo", 
+                                        "note": "", "opt": "", 
+                                        "marca": pulisci_testo(auto['marca']), 
+                                        "versione": pulisci_testo(auto['modello']), 
+                                        "foto_bytes": None, # Non serve l'immagine per la griglia orizzontale
+                                        "p_rca": "250 Euro", "p_if": p_if_val, "p_kasko": "500 Euro", 
+                                        "infort": True, "g_num": gomme_val,
+                                        "vett_sost": None, "canone": float(auto['canone']), 
+                                        "anticipo": float(auto['anticipo']), "durata": dur, 
+                                        "km": km_anno, "iva_text": "Iva Esclusa", 
+                                        "origine_dati": "Fascicolo Rapido" 
+                                    }
+                                    st.session_state["lista_fascicolo"].append(auto_aggiunta)
+                                    st.rerun() 
 
             except Exception as e:
                 st.error(f"Errore caricamento database: {str(e)}")
@@ -507,7 +516,7 @@ if check_password():
 
 
     # ==========================================
-    # SEZIONE 2: PREVENTIVATORE STRUMENTALE
+    # SEZIONE 2: PREVENTIVATORE E STAMPA VERTICALE
     # ==========================================
     elif st.session_state["pagina_attiva"] == "🎯 Preventivatore Strumentale":
         st.title("🎯 Preventivatore Strumentale")
@@ -620,7 +629,7 @@ if check_password():
                 versione_stampa = versione_sel
             
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
-            foto_m = st.file_uploader("Foto Auto (Opzionale)", type=["jpg", "png", "jpeg"])
+            foto_m = st.file_uploader("Foto Auto (Opzionale, se vuoto usa Google)", type=["jpg", "png", "jpeg"])
 
         st.markdown("---")
         st.subheader("🛡️ Servizi e Penali")
@@ -673,10 +682,11 @@ if check_password():
 
         st.markdown("---")
         
-        if st.button("➕ AGGIUNGI AL FASCICOLO"):
+        # --- CARRELLO PREVENTIVO (IN FONDO ALLA PAGINA) ---
+        if st.button("➕ AGGIUNGI AL PREVENTIVO"):
             foto_bytes = foto_m.getvalue() if foto_m else None
             if not foto_bytes:
-                with st.spinner('Ricerca immagine in corso...'):
+                with st.spinner('Ricerca immagine su Google in corso...'):
                     foto_bytes_api = scarica_foto_auto_api(marca_stampa, versione_stampa)
                     if foto_bytes_api: foto_bytes = foto_bytes_api
             
@@ -690,5 +700,60 @@ if check_password():
                 "km": km, "iva_text": iva_text, "origine_dati": st.session_state.get("origine_preventivo", "Manuale") 
             }
             st.session_state["lista_preventivi"].append(auto_aggiunta)
-            st.success(f"✅ Veicolo aggiunto! Puoi stampare la griglia dal menù laterale a sinistra.")
-            st.rerun() # Aggiorna la pagina per mostrare il bottone di stampa subito
+            st.rerun()
+
+        if len(st.session_state["lista_preventivi"]) > 0:
+            st.success(f"🛒 **PREVENTIVO IN CREAZIONE:** Hai {len(st.session_state['lista_preventivi'])} auto in lista.")
+            col_stampa, col_svuota = st.columns([2, 1])
+            with col_stampa:
+                if st.button("🚀 STAMPA PREVENTIVO (VERTICALE CLASSICO)"):
+                    pdf = MaldarizziPDF()
+                    for i, p in enumerate(st.session_state["lista_preventivi"]):
+                        registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
+                        pdf.add_page()
+                        pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
+                        pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
+                        pdf.set_y(45); pdf.set_font(pdf.f_f, "B", 24); pdf.multi_cell(0, 10, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
+                        
+                        if p["foto_bytes"]:
+                            f_path = f"tmp_multi_{i}.jpg" 
+                            with open(f_path, "wb") as f: f.write(p["foto_bytes"])
+                            try: pdf.image(f_path, 25, pdf.get_y() + 2, 160)
+                            except Exception as e: st.error("L'immagine ha un formato incompatibile col PDF.")
+                        
+                        pdf.set_y(155); pdf.set_font(pdf.f_f, "B", 50); pdf.set_text_color(201, 188, 65)
+                        pdf.cell(0, 15, pulisci_testo(f"Euro {str(p['canone']).replace('.0','')} / mese"), align="C", ln=True)
+                        pdf.set_y(180); pdf.set_font(pdf.f_f, "B", 11); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(40, 40, 40)
+                        
+                        voci = [f"{p['durata']} mesi", f"Km {int(p['km']) * int(p['durata']) // 12}", f"Anticipo {str(p['anticipo']).replace('.0','')}", p['iva_text']]
+                        start_x = (210 - (42 * 4 + 4 * 3)) / 2
+                        for idx, voce in enumerate(voci):
+                            pdf.set_xy(start_x + (42 + 4) * idx, 180); pdf.cell(42, 10, pulisci_testo(voce), align="C", fill=True)
+                        
+                        pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
+                        pdf.set_font(pdf.f_f, "", 9)
+                        serv_list = [f"RCA ({p['p_rca']})", f"I/F ({p['p_if']})", f"Kasko ({p['p_kasko']})", "Manutenzione", "Soccorso H24"]
+                        if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
+                        if p.get('infort'): serv_list.append("PAI")
+                        if p.get('vett_sost'): serv_list.append(f"Auto Sost. ({p['vett_sost']})")
+                        pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
+
+                        if p.get('opt'):
+                            pdf.ln(2); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(201, 188, 65); pdf.cell(0, 6, "OPTIONAL INCLUSI", ln=True, align="C")
+                            pdf.set_font(pdf.f_f, "", 8); pdf.set_text_color(255, 255, 255); pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
+
+                        pdf.ln(3); pdf.set_font(pdf.f_f, "I", 8); pdf.set_text_color(180, 180, 180)
+                        pdf.multi_cell(0, 4, "*Le immagini sono puramente indicative.\n*Canone non comprende la tassa automobilistica.\n*Validità offerta: 30 giorni.", align="C")
+                        
+                        pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
+                        pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
+                        pdf.set_font(pdf.f_f, "", 9); pdf.set_text_color(200, 200, 200)
+                        pdf.cell(0, 5, f"E-mail: {email_cons}  |  Tel: {tel_cons}", align="C", ln=True)
+
+                    pdf.output("Preventivo_Verticale.pdf")
+                    with open("Preventivo_Verticale.pdf", "rb") as f:
+                        st.download_button("📩 SCARICA PREVENTIVO (PDF)", f, "Preventivo.pdf", key="dl_prev_vert")
+            with col_svuota:
+                if st.button("🗑️ Svuota Preventivo"):
+                    st.session_state["lista_preventivi"] = []
+                    st.rerun()
