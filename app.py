@@ -164,6 +164,9 @@ def check_password():
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
+# Variabile per il nuovo Carrello delle Promozioni:
+if "lista_fascicolo" not in st.session_state: st.session_state["lista_fascicolo"] = [] 
+
 if "val_canone" not in st.session_state: st.session_state["val_canone"] = 500.0
 if "val_durata" not in st.session_state: st.session_state["val_durata"] = 36
 if "val_km" not in st.session_state: st.session_state["val_km"] = 15000
@@ -177,8 +180,6 @@ if "val_opt" not in st.session_state: st.session_state["val_opt"] = ""
 if "val_p_rca" not in st.session_state: st.session_state["val_p_rca"] = "250 Euro"
 if "val_p_if" not in st.session_state: st.session_state["val_p_if"] = "10%"
 if "val_p_kasko" not in st.session_state: st.session_state["val_p_kasko"] = "500 Euro"
-if "val_usa_gomme" not in st.session_state: st.session_state["val_usa_gomme"] = False
-if "val_tipo_gomme" not in st.session_state: st.session_state["val_tipo_gomme"] = "ILLIMITATE"
 if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
@@ -259,9 +260,28 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: VETRINA
+    # SEZIONE 1: VETRINA E CARRELLO PROMO
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
+        
+        # --- UI DEL CARRELLO PROMO ---
+        if len(st.session_state["lista_fascicolo"]) > 0:
+            st.info(f"🛒 **CARRELLO OFFERTE:** Hai {len(st.session_state['lista_fascicolo'])} promozioni selezionate.")
+            col_cart1, col_cart2 = st.columns([3, 1])
+            with col_cart1:
+                # Campo per intestare il carrello al cliente
+                cliente_carrello = st.text_input("👤 Intesta queste offerte a (Nome Cliente):", value=st.session_state.get("val_cliente", "Gentile CLIENTE"))
+                if cliente_carrello:
+                    st.session_state["val_cliente"] = cliente_carrello
+            with col_cart2:
+                st.write("") # Spaziatura visiva per allineare il bottone
+                st.write("")
+                if st.button("🗑️ Svuota Carrello"):
+                    st.session_state["lista_fascicolo"] = []
+                    st.rerun()
+            st.markdown("---")
+
+
         st.title("🔥 Promozioni del Mese")
         st.markdown("Sfoglia le offerte, verifica i dettagli e trasferiscile nel preventivatore con un clic.")
         
@@ -317,7 +337,7 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
-                # --- ORDINAMENTO DELLE OFFERTE (Dal canone più basso al più alto) ---
+                # --- ORDINAMENTO OFFERTE ---
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
 
                 if not offerte_filtrate:
@@ -343,42 +363,60 @@ if check_password():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # --- MODIFICA BOTTONE E TRASLAZIONE SERVIZI ---
-                            if st.button("➡️ Utilizza la Promo", key=f"btn_promo_{idx}"):
-                                st.session_state["val_marca_stampa"] = auto['marca']
-                                st.session_state["val_versione_stampa"] = auto['modello']
-                                st.session_state["val_canone"] = float(auto['canone'])
-                                st.session_state["val_anticipo"] = float(auto['anticipo'])
-                                st.session_state["val_durata"] = auto['durata']
-                                st.session_state["val_km"] = auto['km']
-                                st.session_state["val_input_mode"] = "Testo Libero"
-                                st.session_state["origine_preventivo"] = "Vetrina Promo" 
-                                
-                                # Logica Intelligente per impostare automaticamente Franchigie e Gomme
-                                p_upper = auto['player'].upper()
-                                t_upper = auto['tipo'].upper()
-                                
-                                st.session_state["val_p_rca"] = "250 Euro"
-                                st.session_state["val_p_kasko"] = "500 Euro"
-                                st.session_state["val_usa_gomme"] = False
-                                st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+                            # --- PULSANTI SEPARATI ---
+                            c_btn1, c_btn2 = st.columns(2)
+                            
+                            with c_btn1:
+                                if st.button("➡️ Utilizza la Promo", key=f"btn_promo_{idx}"):
+                                    st.session_state["val_marca_stampa"] = auto['marca']
+                                    st.session_state["val_versione_stampa"] = auto['modello']
+                                    st.session_state["val_canone"] = float(auto['canone'])
+                                    st.session_state["val_anticipo"] = float(auto['anticipo'])
+                                    st.session_state["val_durata"] = auto['durata']
+                                    st.session_state["val_km"] = auto['km']
+                                    st.session_state["val_input_mode"] = "Testo Libero"
+                                    st.session_state["origine_preventivo"] = "Vetrina Promo" 
+                                    
+                                    # Impostazioni Logiche per la traslazione
+                                    p_upper = auto['player'].upper()
+                                    t_upper = auto['tipo'].upper()
+                                    st.session_state["val_p_rca"] = "250 Euro"
+                                    st.session_state["val_p_kasko"] = "500 Euro"
+                                    st.session_state["val_usa_gomme"] = False
+                                    st.session_state["val_tipo_gomme"] = "ILLIMITATE"
 
-                                if "AYVENS" in p_upper:
-                                    if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
-                                        st.session_state["val_p_if"] = "0%"
-                                        st.session_state["val_usa_gomme"] = True
-                                        st.session_state["val_tipo_gomme"] = "INVERNALI"
-                                    else: 
+                                    if "AYVENS" in p_upper:
+                                        if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                            st.session_state["val_p_if"] = "0%"
+                                            st.session_state["val_usa_gomme"] = True
+                                            st.session_state["val_tipo_gomme"] = "INVERNALI"
+                                        else: 
+                                            st.session_state["val_p_if"] = "500 Euro"
+                                    elif "ARVAL" in p_upper: 
                                         st.session_state["val_p_if"] = "500 Euro"
-                                elif "ARVAL" in p_upper: 
-                                    st.session_state["val_p_if"] = "500 Euro"
-                                elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: 
-                                    st.session_state["val_p_if"] = "10%"
-                                else: 
-                                    st.session_state["val_p_if"] = "10%"
+                                    elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: 
+                                        st.session_state["val_p_if"] = "10%"
+                                    else: 
+                                        st.session_state["val_p_if"] = "10%"
 
-                                st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
-                                st.rerun()
+                                    st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
+                                    st.rerun()
+
+                            with c_btn2:
+                                if st.button("🛒 Aggiungi al Carrello", key=f"btn_cart_{idx}"):
+                                    auto_carrello = {
+                                        "marca": auto['marca'],
+                                        "modello": auto['modello'],
+                                        "canone": auto['canone'],
+                                        "anticipo": auto['anticipo'],
+                                        "durata": auto['durata'],
+                                        "km": auto['km'],
+                                        "player": auto['player'],
+                                        "tipo": auto['tipo']
+                                    }
+                                    st.session_state["lista_fascicolo"].append(auto_carrello)
+                                    st.rerun()
+
             except Exception as e:
                 st.error(f"Errore lettura Excel: {str(e)}")
         else:
@@ -529,19 +567,12 @@ if check_password():
             vett_sost_cat = st.selectbox("Categoria Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY"]) if usa_vett_sost else None
         
         with s3:
-            usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", False))
+            usa_gomme = st.checkbox("Includere Pneumatici?", value=True)
             g_num = "ILLIMITATE"
             if usa_gomme:
-                opzioni_gomme = ["ILLIMITATE", "A NUMERO", "INVERNALI"]
-                idx_gomme = opzioni_gomme.index(st.session_state.get("val_tipo_gomme", "ILLIMITATE")) if st.session_state.get("val_tipo_gomme", "ILLIMITATE") in opzioni_gomme else 0
-                g_tipo = st.radio("Tipo Gomme", opzioni_gomme, horizontal=True, index=idx_gomme)
-                
-                if g_tipo == "A NUMERO":
+                if st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True) == "A NUMERO":
                     g_num = st.number_input("N. Gomme", value=4, min_value=1)
-                elif g_tipo == "INVERNALI":
-                    g_num = "INVERNALI"
-            else: 
-                g_num = None
+            else: g_num = None
 
         st.markdown("---")
         st.subheader("💸 Dati Economici")
