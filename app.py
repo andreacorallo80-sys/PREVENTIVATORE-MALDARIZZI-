@@ -29,9 +29,9 @@ def pulisci_testo(testo):
 def scarica_foto_auto_api(marca, versione):
     # ⚠️ INSERISCI QUI I TUOI DATI GOOGLE:
     GOOGLE_API_KEY = "INSERISCI_QUI_LA_API_KEY_DI_GOOGLE"
-    GOOGLE_CX = "INSERISCI_QUI_IL_CX_DI_GOOGLE"
+    GOOGLE_CX = "419da089f0736400f"
     
-    if GOOGLE_API_KEY == "INSERISCI_QUI_LA_API_KEY_DI_GOOGLE":
+    if GOOGLE_API_KEY == "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI":
         st.warning("⚠️ Diagnostica: Inserisci le chiavi di Google nel codice.")
         return None
 
@@ -593,3 +593,4 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
+
