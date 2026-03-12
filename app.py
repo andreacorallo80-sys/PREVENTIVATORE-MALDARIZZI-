@@ -275,15 +275,22 @@ if check_password():
                 df_promo.columns = df_promo.columns.str.strip()
                 df_promo = df_promo.fillna("") 
                 
-                c_search, c_alimen = st.columns([2, 1])
+                # --- AGGIUNTO IL FILTRO PER SOCIETA' DI NOLEGGIO (PLAYER) ---
+                c_search, c_alimen, c_player = st.columns([2, 1, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
-                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if x])
+                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
                     else:
                         filtro_alimen = "Tutte"
+                with c_player:
+                    if 'PLAYER' in df_promo.columns:
+                        lista_player = ["Tutti"] + sorted([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])
+                        filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
+                    else:
+                        filtro_player = "Tutti"
                 
                 st.markdown("---")
                 offerte_filtrate = []
@@ -308,6 +315,7 @@ if check_password():
 
                     if ricerca and ricerca not in marca and ricerca not in modello.upper(): continue
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
+                    if filtro_player != "Tutti" and player != filtro_player: continue # Esclude se non combacia il player scelto
                         
                     offerte_filtrate.append({
                         "marca": marca, "modello": modello, "canone": canone, 
@@ -315,9 +323,9 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
-                # --- AGGIUNTA STEP 1: ORDINAMENTO PER CANONE ---
+                # --- ORDINAMENTO DELLE OFFERTE DAL CANONE PIÙ BASSO AL PIÙ ALTO ---
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
-
+                
                 if not offerte_filtrate:
                     st.warning("Nessuna offerta trovata con questi parametri.")
                 else:
