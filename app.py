@@ -65,6 +65,7 @@ def show_bananas():
 
 # --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI ---
 def scarica_foto_auto_api(marca, versione):
+    # ⚠️ INSERISCI QUI I TUOI DATI GOOGLE:
     GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
     GOOGLE_CX = "419da089f0736400f"
     
@@ -81,6 +82,7 @@ def scarica_foto_auto_api(marca, versione):
     
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
+            st.toast(f"⚡ Foto recuperata dalla Memoria Interna! (Costo: 0)")
             return f.read()
 
     url_api = "https://www.googleapis.com/customsearch/v1"
@@ -104,10 +106,17 @@ def scarica_foto_auto_api(marca, versione):
                             if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
                                 with open(nome_file_cache, "wb") as f:
                                     f.write(risposta_foto.content)
+                                st.success("✅ FOTO GOOGLE: Scaricata e salvata in Memoria!")
                                 return risposta_foto.content
                         except: continue
+                st.error("❌ I link trovati da Google non erano immagini scaricabili.")
+            else:
+                st.warning(f"⚠️ Google non ha trovato immagini per questa ricerca.")
+        else:
+            st.error(f"❌ Errore Google API: {risposta.json().get('error', {}).get('message', 'Errore Sconosciuto')}")
     except Exception as e:
-        pass
+        st.error(f"❌ Errore di rete: {e}")
+        
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -333,8 +342,9 @@ if check_password():
 
                     # RIGHE
                     pdf_fascicolo.set_text_color(255, 255, 255)
-                   for p in st.session_state["lista_fascicolo"]:
-                        if not isinstance(p, dict): continue # SCUDO
+                    for p in st.session_state["lista_fascicolo"]:
+                        if not isinstance(p, dict): continue # SCUDO ANTI-CRASH
+                        
                         registra_statistica(nome_cons.upper(), p.get('cliente', ''), p['marca'], p['modello'], p['canone'], p['anticipo'], p['durata'], p['km'], "Fascicolo Promo")
                         
                         p_upper = str(p['player']).upper()
@@ -485,6 +495,7 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
+                # Ordinamento per canone più basso
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
 
                 if not offerte_filtrate:
@@ -708,12 +719,12 @@ if check_password():
             rca_options = ["0 Euro", "250 Euro", "500 Euro"]
             rca_idx = rca_options.index(st.session_state.get("val_p_rca", "250 Euro")) if st.session_state.get("val_p_rca", "250 Euro") in rca_options else 1
             p_rca = st.selectbox("Penale RCA", rca_options, index=rca_idx)
-            if_options = ["0%", "5%", "10%", "20%", "250 Euro", "500 Euro", "1000 Euro", "a carico cliente"]
+            if_options = ["0%", "5%", "10%", "250 Euro", "500 Euro"]
             if_idx = if_options.index(st.session_state.get("val_p_if", "10%")) if st.session_state.get("val_p_if", "10%") in if_options else 2
             p_if = st.selectbox("Penale Incendio/Furto", if_options, index=if_idx)
         
         with s2:
-            kasko_options = ["0 Euro", "250 Euro", "500 Euro", "1000 Euro", "a carico cliente"]
+            kasko_options = ["0 Euro", "250 Euro", "500 Euro", "1000 Euro"]
             kasko_idx = kasko_options.index(st.session_state.get("val_p_kasko", "500 Euro")) if st.session_state.get("val_p_kasko", "500 Euro") in kasko_options else 2
             p_kasko = st.selectbox("Penale Danni/Kasko", kasko_options, index=kasko_idx)
             infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
@@ -782,6 +793,7 @@ if check_password():
                 "km": km, "iva_text": iva_text, "origine_dati": st.session_state.get("origine_preventivo", "Manuale") 
             }
             st.session_state["lista_preventivi"].append(auto_aggiunta)
+            st.rerun()
 
         if len(st.session_state["lista_preventivi"]) > 0:
             st.info(f"🛒 **{len(st.session_state['lista_preventivi'])}** veicoli nel preventivo.")
@@ -794,9 +806,9 @@ if check_password():
                 if st.button("🚀 STAMPA PREVENTIVO UNICO"):
                     pdf = MaldarizziPDF()
                     for i, p in enumerate(st.session_state["lista_preventivi"]):
-                        if not isinstance(p, dict): continue # SCUDO
-                        registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
+                        if not isinstance(p, dict): continue # SCUDO ANTI-CRASH
                         
+                        registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
                         pdf.add_page()
                         pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
                         pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
@@ -820,7 +832,7 @@ if check_password():
                         pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
                         pdf.set_font(pdf.f_f, "", 9)
                         
-                        # --- STRINGA DEI SERVIZI COMPLETA ---
+                        # --- LA TUA STRINGA COMPLETA PER IL VERTICALE ---
                         serv_list = [
                             f"RCA (Franchigia {p['p_rca']})", 
                             f"Incendio/Furto (Franchigia {p['p_if']})", 
@@ -849,4 +861,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
-
