@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 import re
@@ -14,7 +14,7 @@ import random
 if not os.path.exists("Foto_Cache"):
     os.makedirs("Foto_Cache")
 
-# --- HELPER LETTURA FILE INTELLIGENTE ---
+# --- HELPER LETTURA FILE ---
 def leggi_file_dati(percorso):
     if percorso.endswith(".csv"):
         try:
@@ -29,25 +29,6 @@ def leggi_file_dati(percorso):
             return df
     else:
         return pd.read_excel(percorso)
-
-# --- TRADUTTORE UNIVERSALE COLONNE (Risolve il problema dei Canoni a 0) ---
-def normalizza_colonne(df):
-    mappa = {}
-    for c in df.columns:
-        cup = str(c).upper().strip()
-        if 'MARC' in cup: mappa[c] = 'MARCA'
-        elif 'MODELL' in cup: mappa[c] = 'MODELLO'
-        elif 'CANON' in cup: mappa[c] = 'CANONE'
-        elif 'ANTICIP' in cup: mappa[c] = 'ANTICIPO'
-        elif 'MES' in cup or 'DURAT' in cup: mappa[c] = 'MESI'
-        elif 'KM' in cup: mappa[c] = 'KM TOTALI'
-        elif 'FUEL' in cup or 'ALIMENTAZION' in cup: mappa[c] = 'ALIMENTAZIONE'
-        elif 'PLAYER' in cup: mappa[c] = 'PLAYER'
-        elif 'COMMISSION' in cup: mappa[c] = 'COMMISSIONI'
-        elif 'OFFERT' in cup: mappa[c] = 'OFFERTA'
-        elif 'LINK' in cup: mappa[c] = 'LINK OFFERTA'
-        else: mappa[c] = cup
-    return df.rename(columns=mappa)
 
 # --- FUNZIONE PULIZIA TESTO ---
 def pulisci_testo(testo):
@@ -101,7 +82,9 @@ def scarica_foto_auto_api(marca, versione):
     nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
     
     if os.path.exists(nome_file_cache):
-        with open(nome_file_cache, "rb") as f: return f.read()
+        with open(nome_file_cache, "rb") as f:
+            st.toast(f"⚡ Foto recuperata dalla Memoria Interna! (Costo: 0)")
+            return f.read()
 
     url_api = "https://www.googleapis.com/customsearch/v1"
     query_ricerca = f"{marca_clean} {modello_clean} {trim_clean} car exterior side view white background"
@@ -124,9 +107,10 @@ def scarica_foto_auto_api(marca, versione):
                             if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
                                 with open(nome_file_cache, "wb") as f:
                                     f.write(risposta_foto.content)
+                                st.success("✅ FOTO GOOGLE: Scaricata e salvata in Memoria!")
                                 return risposta_foto.content
                         except: continue
-    except Exception as e: pass
+    except Exception: pass
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -181,7 +165,7 @@ def check_password():
         return False
     return True
 
-# --- INIZIALIZZAZIONE VARIABILI IN MEMORIA E SCUDO ANTI-CRASH ---
+# --- INIZIALIZZAZIONE VARIABILI E SCUDO ANTI-CRASH ---
 if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = "🔥 Offerte del Mese"
 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
@@ -213,7 +197,7 @@ if "debug_text" not in st.session_state: st.session_state["debug_text"] = ""
 if "val_note" not in st.session_state: st.session_state["val_note"] = ""
 if "origine_preventivo" not in st.session_state: st.session_state["origine_preventivo"] = "Manuale"
 
-# --- 2. CLASSE PDF PREVENTIVATORE (VERTICALE) ---
+# --- CLASSE PDF PREVENTIVATORE (VERTICALE) ---
 class MaldarizziPDF(FPDF):
     def __init__(self):
         super().__init__(orientation='P', unit='mm', format='A4') 
@@ -235,7 +219,7 @@ class MaldarizziPDF(FPDF):
             try: self.image("logo.png", 145, 275, 55)
             except Exception: pass
 
-# --- 3. CLASSE PDF FASCICOLO (ORIZZONTALE) ---
+# --- CLASSE PDF FASCICOLO (ORIZZONTALE) ---
 class FascicoloPDF(FPDF):
     def __init__(self):
         super().__init__(orientation='L', unit='mm', format='A4')
@@ -295,9 +279,7 @@ if check_password():
         st.rerun()
         
     st.sidebar.markdown("---")
-    
     g_validita = st.sidebar.slider("Validità Offerta PDF (gg)", 1, 30, 30)
-    
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 Esci"):
         st.session_state["authenticated"] = False
@@ -412,36 +394,37 @@ if check_password():
             st.markdown("---")
 
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le offerte, verifica i dettagli e trasferiscile nel preventivatore con un clic.")
+        st.markdown("Sfoglia le offerte (ricorda di usare i file Excel con le colonne corrette) e trasferiscile nel preventivatore.")
         
         with st.sidebar.expander("📥 CARICAMENTO DATABASE PROMO", expanded=False):
-            file_promo = st.file_uploader("1. Database Generico", type=["xlsx", "csv"], key="file1")
+            file_promo = st.file_uploader("1. Database Generico (.xlsx)", type=["xlsx", "csv"], key="file1")
             if file_promo:
                 with open("promo_mese.xlsx", "wb") as f: f.write(file_promo.getbuffer())
                 st.success("✅ DB Generico Aggiornato!")
 
-            file_4v = st.file_uploader("2. File 4Vantage Ayvens", type=["xlsx", "csv"], key="file2")
+            file_4v = st.file_uploader("2. File 4Vantage (.xlsx)", type=["xlsx", "csv"], key="file2")
             if file_4v:
-                with open("promo_4vantage.csv", "wb") as f: f.write(file_4v.getbuffer())
+                with open("promo_4vantage.xlsx", "wb") as f: f.write(file_4v.getbuffer())
                 st.success("✅ DB 4Vantage Aggiornato!")
 
         df_list = []
+        
+        # Lettura file generico
         if os.path.exists("promo_mese.xlsx"):
             try:
                 df_main = leggi_file_dati("promo_mese.xlsx")
-                df_main = normalizza_colonne(df_main) # TRADUTTORE ATTIVO
-                df_list.append(df_main)
+                df_main.columns = df_main.columns.str.strip().str.upper()
+                if not df_main.empty: df_list.append(df_main)
             except: pass
 
-        if os.path.exists("promo_4vantage.csv"):
+        # Lettura file 4Vantage (ora richiede la tua intestazione standard)
+        if os.path.exists("promo_4vantage.xlsx"):
             try:
-                df_4v = leggi_file_dati("promo_4vantage.csv")
-                df_4v = normalizza_colonne(df_4v) # TRADUTTORE ATTIVO
-                df_4v['OFFERTA'] = "4VANTAGE"
-                if 'PLAYER' not in df_4v.columns: df_4v['PLAYER'] = "AYVENS"
-                df_list.append(df_4v)
+                df_4v = leggi_file_dati("promo_4vantage.xlsx")
+                df_4v.columns = df_4v.columns.str.strip().str.upper()
+                if not df_4v.empty: df_list.append(df_4v)
             except Exception as e:
-                st.error(f"Errore lettura 4Vantage: {str(e)}")
+                pass
 
         if df_list:
             try:
@@ -805,7 +788,7 @@ if check_password():
                 if st.button("🚀 STAMPA PREVENTIVO UNICO"):
                     pdf = MaldarizziPDF()
                     for i, p in enumerate(st.session_state["lista_preventivi"]):
-                        if not isinstance(p, dict): continue
+                        if not isinstance(p, dict): continue 
                         
                         registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
                         pdf.add_page()
