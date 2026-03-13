@@ -14,28 +14,40 @@ import random
 if not os.path.exists("Foto_Cache"):
     os.makedirs("Foto_Cache")
 
-# --- HELPER LETTURA FILE INTELLIGENTE (RISOLVE TUTTI GLI ERRORI CSV E CANONI A ZERO) ---
+# --- HELPER LETTURA FILE INTELLIGENTE ---
 def leggi_file_dati(percorso):
     if percorso.endswith(".csv"):
-        # 1. "Annusa" il file per capire se usa virgole o punto e virgola
         try:
-            with open(percorso, 'r', encoding='utf-8') as f:
-                prima_riga = f.readline()
-        except:
-            with open(percorso, 'r', encoding='latin-1') as f:
-                prima_riga = f.readline()
-                
-        separatore = ';' if ';' in prima_riga else ','
-        
-        # 2. Legge il file con il separatore corretto, saltando le righe corrotte
-        try:
-            df = pd.read_csv(percorso, sep=separatore, on_bad_lines='skip')
+            df = pd.read_csv(percorso, sep=";", on_bad_lines='skip')
+            if len(df.columns) < 3: 
+                df = pd.read_csv(percorso, sep=",", on_bad_lines='skip')
             return df
         except:
-            df = pd.read_csv(percorso, sep=separatore, encoding="latin-1", on_bad_lines='skip')
+            df = pd.read_csv(percorso, sep=";", encoding="latin-1", on_bad_lines='skip')
+            if len(df.columns) < 3: 
+                df = pd.read_csv(percorso, sep=",", encoding="latin-1", on_bad_lines='skip')
             return df
     else:
         return pd.read_excel(percorso)
+
+# --- TRADUTTORE UNIVERSALE COLONNE (Risolve il problema dei Canoni a 0) ---
+def normalizza_colonne(df):
+    mappa = {}
+    for c in df.columns:
+        cup = str(c).upper().strip()
+        if 'MARC' in cup: mappa[c] = 'MARCA'
+        elif 'MODELL' in cup: mappa[c] = 'MODELLO'
+        elif 'CANON' in cup: mappa[c] = 'CANONE'
+        elif 'ANTICIP' in cup: mappa[c] = 'ANTICIPO'
+        elif 'MES' in cup or 'DURAT' in cup: mappa[c] = 'MESI'
+        elif 'KM' in cup: mappa[c] = 'KM TOTALI'
+        elif 'FUEL' in cup or 'ALIMENTAZION' in cup: mappa[c] = 'ALIMENTAZIONE'
+        elif 'PLAYER' in cup: mappa[c] = 'PLAYER'
+        elif 'COMMISSION' in cup: mappa[c] = 'COMMISSIONI'
+        elif 'OFFERT' in cup: mappa[c] = 'OFFERTA'
+        elif 'LINK' in cup: mappa[c] = 'LINK OFFERTA'
+        else: mappa[c] = cup
+    return df.rename(columns=mappa)
 
 # --- FUNZIONE PULIZIA TESTO ---
 def pulisci_testo(testo):
@@ -89,9 +101,7 @@ def scarica_foto_auto_api(marca, versione):
     nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
     
     if os.path.exists(nome_file_cache):
-        with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto recuperata dalla Memoria Interna! (Costo: 0)")
-            return f.read()
+        with open(nome_file_cache, "rb") as f: return f.read()
 
     url_api = "https://www.googleapis.com/customsearch/v1"
     query_ricerca = f"{marca_clean} {modello_clean} {trim_clean} car exterior side view white background"
@@ -114,17 +124,9 @@ def scarica_foto_auto_api(marca, versione):
                             if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
                                 with open(nome_file_cache, "wb") as f:
                                     f.write(risposta_foto.content)
-                                st.success("✅ FOTO GOOGLE: Scaricata e salvata in Memoria!")
                                 return risposta_foto.content
                         except: continue
-                st.error("❌ I link trovati da Google non erano immagini scaricabili.")
-            else:
-                st.warning(f"⚠️ Google non ha trovato immagini per questa ricerca.")
-        else:
-            st.error(f"❌ Errore Google API: {risposta.json().get('error', {}).get('message', 'Errore Sconosciuto')}")
-    except Exception as e:
-        st.error(f"❌ Errore di rete: {e}")
-        
+    except Exception as e: pass
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
@@ -185,7 +187,6 @@ if "pagina_attiva" not in st.session_state: st.session_state["pagina_attiva"] = 
 if "lista_preventivi" not in st.session_state: st.session_state["lista_preventivi"] = []
 if "lista_fascicolo" not in st.session_state: st.session_state["lista_fascicolo"] = [] 
 
-# SCUDO ANTI-CRASH: Pulisce la memoria da dati sporchi di vecchi test
 st.session_state["lista_preventivi"] = [p for p in st.session_state.get("lista_preventivi", []) if isinstance(p, dict)]
 st.session_state["lista_fascicolo"] = [p for p in st.session_state.get("lista_fascicolo", []) if isinstance(p, dict)]
 
@@ -237,7 +238,7 @@ class MaldarizziPDF(FPDF):
 # --- 3. CLASSE PDF FASCICOLO (ORIZZONTALE) ---
 class FascicoloPDF(FPDF):
     def __init__(self):
-        super().__init__(orientation='L', unit='mm', format='A4') # L = Landscape
+        super().__init__(orientation='L', unit='mm', format='A4')
         self.set_margins(10, 10, 10)
         self.set_auto_page_break(True, margin=15)
         if os.path.exists("Rubik-Light.ttf"): self.add_font("Rubik", "", "Rubik-Light.ttf", uni=True)
@@ -270,7 +271,6 @@ if check_password():
     email_cons = utente_loggato["email"]
     tel_cons = utente_loggato["tel"]
     
-    # --- MENU LATERALE ---
     if os.path.exists("logo.png"): st.sidebar.image("logo.png", width=180)
     st.sidebar.markdown(f"👤 Benvenuto, **{utente_loggato['nome']}**")
     st.sidebar.markdown(f"🏷️ Ruolo: *{utente_loggato['ruolo'].upper()}*")
@@ -296,7 +296,6 @@ if check_password():
         
     st.sidebar.markdown("---")
     
-    # --- VARIABILE GLOBALE PER LA VALIDITÀ OFFERTA ---
     g_validita = st.sidebar.slider("Validità Offerta PDF (gg)", 1, 30, 30)
     
     st.sidebar.markdown("---")
@@ -305,11 +304,10 @@ if check_password():
         st.rerun()
 
     # ==========================================
-    # SEZIONE 1: VETRINA PROMO E FASCICOLO (GRIGLIA)
+    # SEZIONE 1: VETRINA PROMO E FASCICOLO
     # ==========================================
     if st.session_state["pagina_attiva"] == "🔥 Offerte del Mese":
         
-        # --- CARRELLO FASCICOLO IN ALTO ---
         if len(st.session_state["lista_fascicolo"]) > 0:
             st.info(f"🛒 **CARRELLO OFFERTE:** Hai {len(st.session_state['lista_fascicolo'])} promozioni selezionate.")
             col_cart1, col_cart2, col_cart3 = st.columns([2, 1, 1])
@@ -335,7 +333,6 @@ if check_password():
                     pdf_fascicolo.cell(0, 8, f"Spett.le: {pulisci_testo(st.session_state['val_cliente'].upper())}", align="C", ln=True)
                     pdf_fascicolo.ln(10)
 
-                    # INTESTAZIONE TABELLA GRIGLIA
                     pdf_fascicolo.set_font(pdf_fascicolo.f_f, "B", 10)
                     pdf_fascicolo.set_fill_color(50, 50, 50)
                     pdf_fascicolo.set_text_color(201, 188, 65)
@@ -348,10 +345,9 @@ if check_password():
                     pdf_fascicolo.cell(w_serv, 10, " PENALI E SERVIZI INCLUSI", border=1, fill=True)
                     pdf_fascicolo.ln()
 
-                    # RIGHE
                     pdf_fascicolo.set_text_color(255, 255, 255)
                     for p in st.session_state["lista_fascicolo"]:
-                        if not isinstance(p, dict): continue # SCUDO ANTI-CRASH
+                        if not isinstance(p, dict): continue 
                         
                         registra_statistica(nome_cons.upper(), p.get('cliente', ''), p['marca'], p['modello'], p['canone'], p['anticipo'], p['durata'], p['km'], "Fascicolo Promo")
                         
@@ -408,7 +404,6 @@ if check_password():
                     st.session_state["pdf_carrello_pronto"] = False
                     st.rerun()
             
-            # --- MOSTRA TASTO DOWNLOAD E BANANE ---
             if st.session_state.get("pdf_carrello_pronto"):
                 show_bananas()
                 with open("Fascicolo_Offerte.pdf", "rb") as f:
@@ -419,7 +414,6 @@ if check_password():
         st.title("🔥 Promozioni del Mese")
         st.markdown("Sfoglia le offerte, verifica i dettagli e trasferiscile nel preventivatore con un clic.")
         
-        # --- CARICAMENTO DATABASE (CON 4VANTAGE INTEGRATO) ---
         with st.sidebar.expander("📥 CARICAMENTO DATABASE PROMO", expanded=False):
             file_promo = st.file_uploader("1. Database Generico", type=["xlsx", "csv"], key="file1")
             if file_promo:
@@ -435,21 +429,14 @@ if check_password():
         if os.path.exists("promo_mese.xlsx"):
             try:
                 df_main = leggi_file_dati("promo_mese.xlsx")
-                df_main.columns = df_main.columns.str.strip().str.upper()
+                df_main = normalizza_colonne(df_main) # TRADUTTORE ATTIVO
                 df_list.append(df_main)
             except: pass
 
         if os.path.exists("promo_4vantage.csv"):
             try:
                 df_4v = leggi_file_dati("promo_4vantage.csv")
-                df_4v.columns = df_4v.columns.str.strip().str.upper()
-                
-                # --- TRADUTTORE ESATTO DELLE COLONNE 4VANTAGE ---
-                df_4v = df_4v.rename(columns={
-                    'MARCHIO': 'MARCA', 
-                    'FUEL': 'ALIMENTAZIONE', 
-                    'COMMISSIONE': 'COMMISSIONI'
-                })
+                df_4v = normalizza_colonne(df_4v) # TRADUTTORE ATTIVO
                 df_4v['OFFERTA'] = "4VANTAGE"
                 if 'PLAYER' not in df_4v.columns: df_4v['PLAYER'] = "AYVENS"
                 df_list.append(df_4v)
@@ -493,7 +480,7 @@ if check_password():
                     except: canone = 0.0
                     try: anticipo = float(str(row.get('ANTICIPO', 0)).replace(' ', '').replace('€', '').replace(',','.'))
                     except: anticipo = 0.0
-                    try: mesi = int(str(row.get('MESI', 0)).replace(' ', ''))
+                    try: mesi = int(float(str(row.get('MESI', 0)).replace(' ', '').replace(',','.')))
                     except: mesi = 0
                     try: km = int(float(str(row.get('KM TOTALI', 0)).replace(' ', '').replace(',','.')))
                     except: km = 0
@@ -508,7 +495,6 @@ if check_password():
                         "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
                     })
                 
-                # Ordinamento per canone più basso
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
 
                 if not offerte_filtrate:
@@ -819,7 +805,7 @@ if check_password():
                 if st.button("🚀 STAMPA PREVENTIVO UNICO"):
                     pdf = MaldarizziPDF()
                     for i, p in enumerate(st.session_state["lista_preventivi"]):
-                        if not isinstance(p, dict): continue # SCUDO ANTI-CRASH
+                        if not isinstance(p, dict): continue
                         
                         registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
                         pdf.add_page()
@@ -845,7 +831,6 @@ if check_password():
                         pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
                         pdf.set_font(pdf.f_f, "", 9)
                         
-                        # --- STRINGA DEI SERVIZI COMPLETA ---
                         serv_list = [
                             f"RCA (Franchigia {p['p_rca']})", 
                             f"Incendio/Furto (Franchigia {p['p_if']})", 
