@@ -868,7 +868,8 @@ if check_password():
                             pdf.set_font(pdf.f_f, "", 8); pdf.set_text_color(255, 255, 255); pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
 
                         pdf.ln(3); pdf.set_font(pdf.f_f, "I", 8); pdf.set_text_color(180, 180, 180)
-                        pdf.multi_cell(0, 4, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.\*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: 30 giorni.", align="C")
+                        pdf.multi_cell(0, 4, "*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.
+                        \*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: {g_validita} giorni.", align="C")
                         
                         pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
                         pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
@@ -878,4 +879,5 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
+
 
