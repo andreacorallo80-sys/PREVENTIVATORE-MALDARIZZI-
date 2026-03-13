@@ -18,12 +18,14 @@ if not os.path.exists("Foto_Cache"):
 def leggi_file_dati(percorso):
     if percorso.endswith(".csv"):
         try:
-            df = pd.read_csv(percorso, sep=";")
-            if len(df.columns) < 3: df = pd.read_csv(percorso, sep=",")
+            # Prova prima con la virgola (formato standard)
+            df = pd.read_csv(percorso, sep=",")
+            if len(df.columns) < 3: df = pd.read_csv(percorso, sep=";")
             return df
         except:
-            df = pd.read_csv(percorso, sep=";", encoding="latin-1")
-            if len(df.columns) < 3: df = pd.read_csv(percorso, sep=",", encoding="latin-1")
+            # Scudo anti-crash: se ci sono righe scritte male nel csv, le salta
+            df = pd.read_csv(percorso, sep=",", encoding="latin-1", on_bad_lines='skip')
+            if len(df.columns) < 3: df = pd.read_csv(percorso, sep=";", encoding="latin-1", on_bad_lines='skip')
             return df
     else:
         return pd.read_excel(percorso)
@@ -861,3 +863,4 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
+
