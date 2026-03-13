@@ -14,16 +14,25 @@ import random
 if not os.path.exists("Foto_Cache"):
     os.makedirs("Foto_Cache")
 
-# --- HELPER LETTURA FILE ---
+# --- HELPER LETTURA FILE INTELLIGENTE (RISOLVE TUTTI GLI ERRORI CSV E CANONI A ZERO) ---
 def leggi_file_dati(percorso):
     if percorso.endswith(".csv"):
+        # 1. "Annusa" il file per capire se usa virgole o punto e virgola
         try:
-            df = pd.read_csv(percorso, sep=";")
-            if len(df.columns) < 3: df = pd.read_csv(percorso, sep=",")
+            with open(percorso, 'r', encoding='utf-8') as f:
+                prima_riga = f.readline()
+        except:
+            with open(percorso, 'r', encoding='latin-1') as f:
+                prima_riga = f.readline()
+                
+        separatore = ';' if ';' in prima_riga else ','
+        
+        # 2. Legge il file con il separatore corretto, saltando le righe corrotte
+        try:
+            df = pd.read_csv(percorso, sep=separatore, on_bad_lines='skip')
             return df
         except:
-            df = pd.read_csv(percorso, sep=";", encoding="latin-1")
-            if len(df.columns) < 3: df = pd.read_csv(percorso, sep=",", encoding="latin-1")
+            df = pd.read_csv(percorso, sep=separatore, encoding="latin-1", on_bad_lines='skip')
             return df
     else:
         return pd.read_excel(percorso)
@@ -65,7 +74,6 @@ def show_bananas():
 
 # --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI ---
 def scarica_foto_auto_api(marca, versione):
-    # ⚠️ INSERISCI QUI I TUOI DATI GOOGLE:
     GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
     GOOGLE_CX = "419da089f0736400f"
     
@@ -288,7 +296,7 @@ if check_password():
         
     st.sidebar.markdown("---")
     
-    # --- VARIABILE GLOBALE PER LA VALIDITÀ OFFERTA (Così la leggono tutti i PDF senza dare errore) ---
+    # --- VARIABILE GLOBALE PER LA VALIDITÀ OFFERTA ---
     g_validita = st.sidebar.slider("Validità Offerta PDF (gg)", 1, 30, 30)
     
     st.sidebar.markdown("---")
@@ -435,13 +443,18 @@ if check_password():
             try:
                 df_4v = leggi_file_dati("promo_4vantage.csv")
                 df_4v.columns = df_4v.columns.str.strip().str.upper()
-                # Traduttore Universale colonne 4Vantage
-                df_4v = df_4v.rename(columns={'MARCHIO': 'MARCA', 'KMS': 'KM TOTALI', 'KMS ': 'KM TOTALI', 'FUEL': 'ALIMENTAZIONE', 'COMMISSIONE': 'COMMISSIONI', 'COMMISSIONE ': 'COMMISSIONI'})
+                
+                # --- TRADUTTORE ESATTO DELLE COLONNE 4VANTAGE ---
+                df_4v = df_4v.rename(columns={
+                    'MARCHIO': 'MARCA', 
+                    'FUEL': 'ALIMENTAZIONE', 
+                    'COMMISSIONE': 'COMMISSIONI'
+                })
                 df_4v['OFFERTA'] = "4VANTAGE"
                 if 'PLAYER' not in df_4v.columns: df_4v['PLAYER'] = "AYVENS"
                 df_list.append(df_4v)
             except Exception as e:
-                st.error(f"Errore 4Vantage: {str(e)}")
+                st.error(f"Errore lettura 4Vantage: {str(e)}")
 
         if df_list:
             try:
@@ -476,11 +489,11 @@ if check_password():
                     link_raw = str(row.get('LINK OFFERTA', '')).strip() if 'LINK OFFERTA' in df_promo.columns else str(row.get('link offerta', '')).strip()
                     link_valido = link_raw if link_raw.startswith("http") else ("https://" + link_raw if link_raw.startswith("www") else "")
                     
-                    try: canone = float(str(row.get('CANONE', 0)).replace(' ', '').replace(',','.'))
+                    try: canone = float(str(row.get('CANONE', 0)).replace(' ', '').replace('€', '').replace(',','.'))
                     except: canone = 0.0
-                    try: anticipo = float(str(row.get('ANTICIPO', 0)).replace(' ', '').replace(',','.'))
+                    try: anticipo = float(str(row.get('ANTICIPO', 0)).replace(' ', '').replace('€', '').replace(',','.'))
                     except: anticipo = 0.0
-                    try: mesi = int(row.get('MESI', 0))
+                    try: mesi = int(str(row.get('MESI', 0)).replace(' ', ''))
                     except: mesi = 0
                     try: km = int(float(str(row.get('KM TOTALI', 0)).replace(' ', '').replace(',','.')))
                     except: km = 0
@@ -719,12 +732,12 @@ if check_password():
             rca_options = ["0 Euro", "250 Euro", "500 Euro"]
             rca_idx = rca_options.index(st.session_state.get("val_p_rca", "250 Euro")) if st.session_state.get("val_p_rca", "250 Euro") in rca_options else 1
             p_rca = st.selectbox("Penale RCA", rca_options, index=rca_idx)
-            if_options = ["0%", "5%", "10%", "250 Euro", "500 Euro"]
+            if_options = ["0%", "5%", "10%", "20%", "250 Euro", "500 Euro", "1000 Euro", "a carico cliente"]
             if_idx = if_options.index(st.session_state.get("val_p_if", "10%")) if st.session_state.get("val_p_if", "10%") in if_options else 2
             p_if = st.selectbox("Penale Incendio/Furto", if_options, index=if_idx)
         
         with s2:
-            kasko_options = ["0 Euro", "250 Euro", "500 Euro", "1000 Euro"]
+            kasko_options = ["0 Euro", "250 Euro", "500 Euro", "1000 Euro", "a carico cliente"]
             kasko_idx = kasko_options.index(st.session_state.get("val_p_kasko", "500 Euro")) if st.session_state.get("val_p_kasko", "500 Euro") in kasko_options else 2
             p_kasko = st.selectbox("Penale Danni/Kasko", kasko_options, index=kasko_idx)
             infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
@@ -832,7 +845,7 @@ if check_password():
                         pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
                         pdf.set_font(pdf.f_f, "", 9)
                         
-                        # --- LA TUA STRINGA COMPLETA PER IL VERTICALE ---
+                        # --- STRINGA DEI SERVIZI COMPLETA ---
                         serv_list = [
                             f"RCA (Franchigia {p['p_rca']})", 
                             f"Incendio/Furto (Franchigia {p['p_if']})", 
@@ -851,7 +864,7 @@ if check_password():
                             pdf.set_font(pdf.f_f, "", 8); pdf.set_text_color(255, 255, 255); pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
 
                         pdf.ln(3); pdf.set_font(pdf.f_f, "I", 8); pdf.set_text_color(180, 180, 180)
-                        pdf.multi_cell(0, 4, f"*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.\*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: {g_validita} giorni.", align="C")
+                        pdf.multi_cell(0, 4, f"*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.\n*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: {g_validita} giorni.", align="C")
                         
                         pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
                         pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
@@ -861,5 +874,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
-
-
