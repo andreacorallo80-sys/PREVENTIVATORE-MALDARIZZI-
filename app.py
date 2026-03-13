@@ -486,11 +486,11 @@ if check_password():
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
                     if filtro_player != "Tutti" and player != filtro_player: continue
                     
-                    # Logica Intelligente Filtro Cliente (Se cerco PRIVATO o PARTITA IVA, mi mostra anche ENTRAMBI)
+                    # Logica Intelligente Filtro Cliente (Se cerco PRIVATO o P.IVA, mi mostra anche ENTRAMBI)
                     if filtro_tipo != "Tutti":
                         if filtro_tipo == "PRIVATO" and tipo_cliente_off == "ENTRAMBI":
                             pass # mostra
-                        elif filtro_tipo == "PARTITA IVA" and tipo_cliente_off == "ENTRAMBI":
+                        elif filtro_tipo == "P.IVA" and tipo_cliente_off == "ENTRAMBI":
                             pass # mostra
                         elif tipo_cliente_off != filtro_tipo:
                             continue
