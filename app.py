@@ -333,7 +333,8 @@ if check_password():
 
                     # RIGHE
                     pdf_fascicolo.set_text_color(255, 255, 255)
-                    for p in st.session_state["lista_fascicolo"]:
+                   for p in st.session_state["lista_fascicolo"]:
+                        if not isinstance(p, dict): continue # SCUDO
                         registra_statistica(nome_cons.upper(), p.get('cliente', ''), p['marca'], p['modello'], p['canone'], p['anticipo'], p['durata'], p['km'], "Fascicolo Promo")
                         
                         p_upper = str(p['player']).upper()
@@ -793,9 +794,9 @@ if check_password():
                 if st.button("🚀 STAMPA PREVENTIVO UNICO"):
                     pdf = MaldarizziPDF()
                     for i, p in enumerate(st.session_state["lista_preventivi"]):
-                        if not isinstance(p, dict): continue # SCUDO ANTI-CRASH
-                        
+                        if not isinstance(p, dict): continue # SCUDO
                         registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
+                        
                         pdf.add_page()
                         pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
                         pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
@@ -848,3 +849,4 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
+
