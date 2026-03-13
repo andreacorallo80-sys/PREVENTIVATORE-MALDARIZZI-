@@ -555,4 +555,326 @@ if check_password():
                                     st.session_state["origine_preventivo"] = "Vetrina Promo" 
                                     
                                     p_upper = auto['player'].upper()
-                                    t_upper
+                                    t_upper = auto['tipo'].upper()
+                                    st.session_state["val_p_rca"] = "250 Euro"
+                                    st.session_state["val_p_kasko"] = "500 Euro"
+                                    st.session_state["val_usa_gomme"] = False
+                                    st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+                                    st.session_state["val_n_gomme"] = 4
+                                    st.session_state["val_stagione_gomme"] = "Estive"
+
+                                    if "AYVENS" in p_upper:
+                                        if "4VANTAGE" in t_upper or "4 VANTAGE" in t_upper:
+                                            st.session_state["val_p_if"] = "0%"
+                                            st.session_state["val_usa_gomme"] = True
+                                            st.session_state["val_tipo_gomme"] = "A NUMERO"
+                                            st.session_state["val_n_gomme"] = 4
+                                            st.session_state["val_stagione_gomme"] = "Invernali"
+                                        else: 
+                                            st.session_state["val_p_if"] = "500 Euro"
+                                    elif "ARVAL" in p_upper: 
+                                        st.session_state["val_p_if"] = "500 Euro"
+                                    elif "LEASYS" in p_upper or "SANTANDER" in p_upper or "ALPHABET" in p_upper: 
+                                        st.session_state["val_p_if"] = "10%"
+                                    else: 
+                                        st.session_state["val_p_if"] = "10%"
+
+                                    st.session_state["pagina_attiva"] = "🎯 Preventivatore Strumentale"
+                                    st.rerun()
+
+                            with c_btn2:
+                                if st.button("🛒 Aggiungi al Carrello", key=f"btn_cart_{idx}"):
+                                    dur = auto['durata']
+                                    km_anno = int((auto['km'] / dur) * 12) if dur > 0 else auto['km']
+                                    
+                                    auto_carrello = {
+                                        "marca": auto['marca'],
+                                        "modello": auto['modello'],
+                                        "canone": auto['canone'],
+                                        "anticipo": auto['anticipo'],
+                                        "durata": auto['durata'],
+                                        "km": km_anno,
+                                        "player": auto['player'],
+                                        "tipo": auto['tipo']
+                                    }
+                                    st.session_state["lista_fascicolo"].append(auto_carrello)
+                                    st.session_state["pdf_carrello_pronto"] = False 
+                                    st.rerun()
+
+            except Exception as e:
+                st.error(f"Errore caricamento database: {str(e)}")
+        else:
+            st.info("👈 Apri il menù 'CARICAMENTO DATABASE PROMO' nel menù laterale per inserire i file.")
+
+
+    # ==========================================
+    # SEZIONE 2: PREVENTIVATORE (VERTICALE)
+    # ==========================================
+    elif st.session_state["pagina_attiva"] == "🎯 Preventivatore Strumentale":
+        st.title("🎯 Preventivatore Strumentale (Con Motore Google)")
+        
+        st.sidebar.header("📥 Importa PDF Portale")
+        pdf_portale = st.sidebar.file_uploader("Carica PDF (Arval, Leasys, Ayvens)", type=["pdf"])
+        if pdf_portale and st.sidebar.button("🧠 Analizza e Compila Dati dal PDF"):
+            try:
+                pdf_bytes = io.BytesIO(pdf_portale.getvalue())
+                reader = pypdf.PdfReader(pdf_bytes)
+                testo_flat = re.sub(r'\s+', ' ', "".join([p.extract_text() for p in reader.pages])).strip()
+                testo_upper = testo_flat.upper()
+                st.session_state["debug_text"] = testo_flat
+                st.session_state["val_input_mode"] = "Testo Libero"
+                st.session_state["origine_preventivo"] = "Importazione da PDF"
+                
+                st.session_state["val_tipo_cliente"] = "Privato" if "IVA INCLUSA" in testo_upper or "C.F." in testo_upper or "PRIVATO" in testo_upper else "Partita IVA"
+                brands = ['FIAT', 'CITROEN', 'FORD', 'AUDI', 'BMW', 'MERCEDES', 'VOLKSWAGEN', 'PEUGEOT', 'RENAULT', 'OPEL', 'ALFA ROMEO', 'JEEP', 'TOYOTA', 'NISSAN', 'VOLVO', 'KIA', 'HYUNDAI', 'DACIA', 'LANCIA', 'SEAT', 'CUPRA', 'SUZUKI', 'MAZDA', 'LAND ROVER', 'PORSCHE', 'TESLA', 'MINI', 'LEXUS', 'MASERATI', 'SMART', 'SKODA', 'HONDA', 'MG', 'DS', 'IVECO']
+
+                if "AYVENS" in testo_upper or "SOCIETE GENERALE" in testo_upper or "ALD AUTOMOTIVE" in testo_upper:
+                    m_cli = re.search(r':\s*([A-Za-z\s\,\'\.\-]+?)\s*\d{6,9}/\d{2,3}', testo_flat)
+                    if m_cli: st.session_state["val_cliente"] = m_cli.group(1).split(",")[0].strip().upper()
+                    m_vei = re.search(r'Veicolo:\s*(.*?)\s*Codici:', testo_flat, re.IGNORECASE) or re.search(r'Venduto\s+.*?(.*?)\s+\d{2}/\d{2}/\d{4}', testo_flat, re.IGNORECASE)
+                    if m_vei:
+                        vei = m_vei.group(1).strip()
+                        st.session_state["val_versione_stampa"] = vei
+                        st.session_state["val_marca_stampa"] = next((b for b in brands if vei.upper().startswith(b)), vei.split()[0].upper())
+                    m_dur_km = re.search(r'\b(24|36|48|60)\s+(\d{4,7})\s+€', testo_flat)
+                    if m_dur_km:
+                        st.session_state["val_durata"] = int(m_dur_km.group(1))
+                        st.session_state["val_km"] = int((int(m_dur_km.group(2)) / st.session_state["val_durata"]) * 12) if st.session_state["val_durata"]>0 else 0
+                    m_can = re.findall(r'€\s*(\d{2,4}[,.]\d{2})', testo_flat)
+                    if m_can: st.session_state["val_canone"] = sorted([float(c.replace(',', '.')) for c in m_can], reverse=True)[0]
+                    m_ant = re.search(r'Anticipo\s*\(iva\s*esclusa\)\s*€\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                    if m_ant: st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
+
+                elif "LEASYS" in testo_upper:
+                    m_cli = re.search(r'VENDITA\s+(.*?)\s+MALDARIZZI', testo_flat, re.IGNORECASE)
+                    if m_cli: st.session_state["val_cliente"] = m_cli.group(1).replace("SRL", "").replace("SPA", "").strip()
+                    m_marca = re.search(r'Marca\s+([A-Za-z0-9\-]+)', testo_flat, re.IGNORECASE)
+                    if m_marca: st.session_state["val_marca_stampa"] = m_marca.group(1).upper().strip()
+                    m_ver = re.search(r'Versione\s+(.*?)\s+Canone Totale', testo_flat, re.IGNORECASE)
+                    if m_ver: st.session_state["val_versione_stampa"] = m_ver.group(1).strip()
+                    m_dur = re.search(r'Durata\s+(\d{2,3})', testo_flat, re.IGNORECASE)
+                    if m_dur: st.session_state["val_durata"] = int(m_dur.group(1))
+                    m_km = re.search(r'km totali\s+([\d\s]+)\b', testo_flat, re.IGNORECASE)
+                    if m_km: st.session_state["val_km"] = int((int(m_km.group(1).replace(' ', '')) / st.session_state["val_durata"]) * 12) if st.session_state.get("val_durata",0)>0 else 0
+                    m_can = re.search(r'Canone Totale\s+€\s*(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                    if m_can: st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
+                    m_ant = re.search(r'Anticipo\s*€\s*([\d\s]+[,.]\d{2})', testo_flat, re.IGNORECASE)
+                    if m_ant: st.session_state["val_anticipo"] = float(m_ant.group(1).replace(' ', '').replace(',', '.'))
+
+                elif "ARVAL" in testo_upper:
+                    m_cli = re.search(r'Ragione Sociale\s+([A-Za-z0-9\s\&\.\'\-]+?)\s+(?:CF Cliente|C\.F\.|Codice|P\.?IVA)', testo_flat, re.IGNORECASE)
+                    if m_cli: st.session_state["val_cliente"] = m_cli.group(1).strip().upper()
+                    m_vei = re.search(r'per il veicolo\s+(.*?)\s+Canone', testo_flat, re.IGNORECASE)
+                    if m_vei:
+                        vei = m_vei.group(1).strip()
+                        st.session_state["val_versione_stampa"] = vei
+                        st.session_state["val_marca_stampa"] = next((b for b in brands if vei.upper().startswith(b)), vei.split()[0].upper())
+                    m_can = re.search(r'Canone\s+(\d{1,4}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                    if m_can: st.session_state["val_canone"] = float(m_can.group(1).replace(',', '.'))
+                    m_dur = re.search(r'durata\s+(\d{2,3})\s*mesi', testo_flat, re.IGNORECASE)
+                    if m_dur: st.session_state["val_durata"] = int(m_dur.group(1))
+                    m_km = re.search(r'km totali\s+(\d{2,6})', testo_flat, re.IGNORECASE)
+                    if m_km: st.session_state["val_km"] = int((int(m_km.group(1)) / st.session_state.get("val_durata", 36)) * 12)
+                    m_ant = re.search(r'Anticipo\s*(?:€|Euro)?\s*(\d{1,6}[,.]\d{2})', testo_flat, re.IGNORECASE)
+                    if m_ant: st.session_state["val_anticipo"] = float(m_ant.group(1).replace(',', '.'))
+
+                st.sidebar.success("✅ Dati estratti chirurgicamente!")
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Errore analisi PDF: {str(e)}")
+
+        st.sidebar.markdown("---")
+        uploaded_excel = st.sidebar.file_uploader("Aggiorna Listino (Excel)", type=["xlsx"])
+        if uploaded_excel:
+            with open("dati.xlsx", "wb") as f: f.write(uploaded_excel.getbuffer())
+            st.sidebar.success("Database aggiornato!")
+
+        if os.path.exists("dati.xlsx"):
+            excel = pd.ExcelFile("dati.xlsx")
+            foglio = st.sidebar.selectbox("Seleziona Categoria", excel.sheet_names)
+            df = pd.read_excel("dati.xlsx", sheet_name=foglio, dtype=str)
+        else:
+            st.sidebar.warning("Carica dati.xlsx per ricerca da listino")
+        
+        g_validita = st.sidebar.slider("Validità Offerta (gg)", 1, 30, 30)
+
+        nome_cons = utente_loggato["nome"]
+        email_cons = utente_loggato["email"]
+        tel_cons = utente_loggato["tel"]
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("👤 Cliente")
+            idx_tipo_cli = 1 if st.session_state.get("val_tipo_cliente", "Partita IVA") == "Privato" else 0
+            tipo_cliente = st.radio("Tipologia", ["Partita IVA", "Privato"], index=idx_tipo_cli, horizontal=True)
+            nome_cliente = st.text_input("Nome Cliente", value=st.session_state.get("val_cliente", ""))
+            consegna = st.selectbox("Luogo Consegna", ["IN SEDE MALDARIZZI", "A DOMICILIO"])
+            t_veicolo = st.radio("Stato Veicolo (Stampa)", ["Nuovo", "Usato"], horizontal=True)
+            note_p = st.text_area("Note aggiuntive", value=st.session_state.get("val_note", ""), height=70)
+        
+        with c2:
+            st.subheader("🚘 Veicolo")
+            idx_input_mode = 1 if st.session_state.get("val_input_mode") == "Testo Libero" else 0
+            input_mode = st.radio("Modalità Inserimento", ["Da Listino", "Testo Libero"], horizontal=True, index=idx_input_mode)
+            
+            if input_mode == "Testo Libero" or not os.path.exists("dati.xlsx"):
+                marca_stampa = st.text_input("Marca", value=st.session_state.get("val_marca_stampa", ""))
+                versione_stampa = st.text_area("Allestimento/Versione", value=st.session_state.get("val_versione_stampa", ""))
+            else:
+                marca_sel = st.selectbox("Marca", sorted(df['Brand Description'].unique().tolist()))
+                modello_sel = st.selectbox("Modello (Filtro)", sorted(df[df['Brand Description']==marca_sel]['Vehicle Set description'].unique().tolist()))
+                versione_sel = st.selectbox("Versione/Allestimento", sorted(df[(df['Brand Description']==marca_sel) & (df['Vehicle Set description']==modello_sel)]['Jato Product Description'].unique().tolist()))
+                marca_stampa = marca_sel
+                versione_stampa = versione_sel
+            
+            opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
+            foto_m = st.file_uploader("Foto Auto (Se vuoto usa GOOGLE API)", type=["jpg", "png", "jpeg"])
+
+        st.markdown("---")
+        st.subheader("🛡️ Servizi e Penali")
+        s1, s2, s3 = st.columns(3)
+        
+        with s1:
+            rca_options = ["0 Euro", "250 Euro", "500 Euro"]
+            rca_idx = rca_options.index(st.session_state.get("val_p_rca", "250 Euro")) if st.session_state.get("val_p_rca", "250 Euro") in rca_options else 1
+            p_rca = st.selectbox("Penale RCA", rca_options, index=rca_idx)
+            if_options = ["0%", "5%", "10%", "250 Euro", "500 Euro"]
+            if_idx = if_options.index(st.session_state.get("val_p_if", "10%")) if st.session_state.get("val_p_if", "10%") in if_options else 2
+            p_if = st.selectbox("Penale Incendio/Furto", if_options, index=if_idx)
+        
+        with s2:
+            kasko_options = ["0 Euro", "250 Euro", "500 Euro", "1000 Euro"]
+            kasko_idx = kasko_options.index(st.session_state.get("val_p_kasko", "500 Euro")) if st.session_state.get("val_p_kasko", "500 Euro") in kasko_options else 2
+            p_kasko = st.selectbox("Penale Danni/Kasko", kasko_options, index=kasko_idx)
+            infort = st.checkbox("Infortunio Conducente (PAI)", value=True)
+            usa_vett_sost = st.checkbox("Vettura Sostitutiva?", value=False)
+            vett_sost_cat = st.selectbox("Categoria Sostitutiva", ["ECONOMY", "FAMILY SMALL", "FAMILY LARGE", "EXECUTIVE", "LUXURY"]) if usa_vett_sost else None
+        
+        with s3:
+            usa_gomme = st.checkbox("Includere Pneumatici?", value=st.session_state.get("val_usa_gomme", False))
+            g_num = "ILLIMITATE"
+            
+            if usa_gomme:
+                valore_memoria = str(st.session_state.get("val_tipo_gomme", "ILLIMITATE"))
+                idx_g = 1 if valore_memoria == "A NUMERO" else 0
+                
+                g_tipo = st.radio("Tipo Gomme", ["ILLIMITATE", "A NUMERO"], horizontal=True, index=idx_g)
+                
+                if g_tipo == "A NUMERO":
+                    c_g1, c_g2 = st.columns([1, 2])
+                    with c_g1:
+                        n_gomme = st.number_input("Numero", value=int(st.session_state.get("val_n_gomme", 4)), min_value=1)
+                    with c_g2:
+                        stag_opts = ["Estive", "Invernali", "All Season"]
+                        val_stag = str(st.session_state.get("val_stagione_gomme", "Estive"))
+                        stag_idx = stag_opts.index(val_stag) if val_stag in stag_opts else 0
+                        stagione_gomme = st.selectbox("Stagione", stag_opts, index=stag_idx)
+                        
+                    g_num = f"{n_gomme} {stagione_gomme}"
+                    st.session_state["val_tipo_gomme"] = "A NUMERO"
+                    st.session_state["val_n_gomme"] = n_gomme
+                    st.session_state["val_stagione_gomme"] = stagione_gomme
+                else:
+                    g_num = "ILLIMITATE"
+                    st.session_state["val_tipo_gomme"] = "ILLIMITATE"
+            else: 
+                g_num = None
+                st.session_state["val_usa_gomme"] = False
+
+        st.markdown("---")
+        st.subheader("💸 Dati Economici")
+        n1, n2, n3, n4 = st.columns(4)
+        iva_text = "Iva Inclusa" if tipo_cliente == "Privato" else "Iva Esclusa"
+        with n1: canone = st.number_input(f"Canone ({iva_text})", value=float(st.session_state["val_canone"]))
+        with n2: anticipo = st.number_input(f"Anticipo ({iva_text})", value=float(st.session_state["val_anticipo"]))
+        with n3: 
+            durate_disp = [24, 36, 48, 60]
+            val_durata = int(st.session_state.get("val_durata", 36))
+            if val_durata not in durate_disp: durate_disp.append(val_durata)
+            durata = st.selectbox("Durata", sorted(durate_disp), index=sorted(durate_disp).index(val_durata))
+        with n4: km = st.number_input("Km/Anno", value=int(st.session_state["val_km"]))
+
+        st.markdown("---")
+        if st.button("➕ AGGIUNGI AL DOCUMENTO"):
+            foto_bytes = foto_m.getvalue() if foto_m else None
+            if not foto_bytes:
+                with st.spinner('Ricerca immagine su Google in corso...'):
+                    foto_bytes_api = scarica_foto_auto_api(marca_stampa, versione_stampa)
+                    if foto_bytes_api: foto_bytes = foto_bytes_api
+            
+            auto_aggiunta = {
+                "cliente": pulisci_testo(nome_cliente), "consegna": pulisci_testo(consegna), 
+                "t_veicolo": pulisci_testo(t_veicolo), "note": pulisci_testo(note_p), "opt": pulisci_testo(opt_p), 
+                "marca": pulisci_testo(marca_stampa), "versione": pulisci_testo(versione_stampa), 
+                "foto_bytes": foto_bytes, "p_rca": pulisci_testo(p_rca), "p_if": pulisci_testo(p_if), 
+                "p_kasko": pulisci_testo(p_kasko), "infort": infort, "g_num": pulisci_testo(g_num) if g_num else None,
+                "vett_sost": pulisci_testo(vett_sost_cat), "canone": canone, "anticipo": anticipo, "durata": durata, 
+                "km": km, "iva_text": iva_text, "origine_dati": st.session_state.get("origine_preventivo", "Manuale") 
+            }
+            st.session_state["lista_preventivi"].append(auto_aggiunta)
+            st.rerun()
+
+        if len(st.session_state["lista_preventivi"]) > 0:
+            st.info(f"🛒 **{len(st.session_state['lista_preventivi'])}** veicoli nel preventivo.")
+            col_stampa, col_svuota = st.columns([2, 1])
+            with col_svuota:
+                if st.button("🗑️ Svuota Lista"):
+                    st.session_state["lista_preventivi"] = []
+                    st.rerun()
+            with col_stampa:
+                if st.button("🚀 STAMPA PREVENTIVO UNICO"):
+                    pdf = MaldarizziPDF()
+                    for i, p in enumerate(st.session_state["lista_preventivi"]):
+                        registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
+                        pdf.add_page()
+                        pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
+                        pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
+                        pdf.set_y(45); pdf.set_font(pdf.f_f, "B", 24); pdf.multi_cell(0, 10, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
+                        
+                        if p.get("foto_bytes"):
+                            f_path = f"tmp_multi_{i}.jpg" 
+                            with open(f_path, "wb") as f: f.write(p["foto_bytes"])
+                            try: pdf.image(f_path, 25, pdf.get_y() + 2, 160)
+                            except Exception as e: st.error("L'immagine di Google ha un formato incompatibile col PDF.")
+                        
+                        pdf.set_y(155); pdf.set_font(pdf.f_f, "B", 50); pdf.set_text_color(201, 188, 65)
+                        pdf.cell(0, 15, pulisci_testo(f"Euro {str(p['canone']).replace('.0','')} / mese"), align="C", ln=True)
+                        pdf.set_y(180); pdf.set_font(pdf.f_f, "B", 11); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(40, 40, 40)
+                        
+                        voci = [f"{p['durata']} mesi", f"Km {int(p['km']) * int(p['durata']) // 12}", f"Anticipo {str(p['anticipo']).replace('.0','')}", p['iva_text']]
+                        start_x = (210 - (42 * 4 + 4 * 3)) / 2
+                        for idx, voce in enumerate(voci):
+                            pdf.set_xy(start_x + (42 + 4) * idx, 180); pdf.cell(42, 10, pulisci_testo(voce), align="C", fill=True)
+                        
+                        pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
+                        pdf.set_font(pdf.f_f, "", 9)
+                        
+                        # --- LA TUA STRINGA COMPLETA PER IL VERTICALE ---
+                        serv_list = [
+                            f"RCA (Franchigia {p['p_rca']})", 
+                            f"Incendio/Furto (Franchigia {p['p_if']})", 
+                            f"Danni/Kasko (Franchigia {p['p_kasko']})", 
+                            "Manutenzione Ordinaria/Straordinaria", 
+                            "Assistenza Stradale H24"
+                        ]
+                        if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
+                        if p.get('infort'): serv_list.append("Infortunio Conducente (PAI)")
+                        if p.get('vett_sost'): serv_list.append(f"Vettura Sostitutiva ({p['vett_sost']})")
+                        
+                        pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
+
+                        if p.get('opt'):
+                            pdf.ln(2); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(201, 188, 65); pdf.cell(0, 6, "OPTIONAL INCLUSI", ln=True, align="C")
+                            pdf.set_font(pdf.f_f, "", 8); pdf.set_text_color(255, 255, 255); pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
+
+                        pdf.ln(3); pdf.set_font(pdf.f_f, "I", 8); pdf.set_text_color(180, 180, 180)
+                        pdf.multi_cell(0, 4, "*Le immagini sono puramente indicative.\n*Canone non comprende la tassa automobilistica.\n*Validità offerta: 30 giorni.", align="C")
+                        
+                        pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
+                        pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
+                        pdf.set_font(pdf.f_f, "", 9); pdf.set_text_color(200, 200, 200)
+                        pdf.cell(0, 5, f"E-mail: {email_cons}  |  Tel: {tel_cons}", align="C", ln=True)
+
+                    pdf.output("preventivo_multiplo.pdf")
+                    with open("preventivo_multiplo.pdf", "rb") as f:
+                        st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
