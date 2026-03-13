@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 import re
@@ -394,7 +394,7 @@ if check_password():
             st.markdown("---")
 
         st.title("🔥 Promozioni del Mese")
-        st.markdown("Sfoglia le offerte (ricorda di usare i file Excel con le colonne corrette) e trasferiscile nel preventivatore.")
+        st.markdown("Sfoglia le offerte e trasferiscile nel preventivatore.")
         
         with st.sidebar.expander("📥 CARICAMENTO DATABASE PROMO", expanded=False):
             file_promo = st.file_uploader("1. Database Generico (.xlsx)", type=["xlsx", "csv"], key="file1")
@@ -406,10 +406,16 @@ if check_password():
             if file_4v:
                 with open("promo_4vantage.xlsx", "wb") as f: f.write(file_4v.getbuffer())
                 st.success("✅ DB 4Vantage Aggiornato!")
+                
+            st.markdown("---")
+            if st.button("🗑️ Elimina tutti i Database"):
+                if os.path.exists("promo_mese.xlsx"): os.remove("promo_mese.xlsx")
+                if os.path.exists("promo_4vantage.xlsx"): os.remove("promo_4vantage.xlsx")
+                st.success("✅ Vetrina svuotata con successo!")
+                st.rerun()
 
         df_list = []
         
-        # Lettura file generico
         if os.path.exists("promo_mese.xlsx"):
             try:
                 df_main = leggi_file_dati("promo_mese.xlsx")
@@ -417,7 +423,6 @@ if check_password():
                 if not df_main.empty: df_list.append(df_main)
             except: pass
 
-        # Lettura file 4Vantage (ora richiede la tua intestazione standard)
         if os.path.exists("promo_4vantage.xlsx"):
             try:
                 df_4v = leggi_file_dati("promo_4vantage.xlsx")
@@ -431,18 +436,25 @@ if check_password():
                 df_promo = pd.concat(df_list, ignore_index=True)
                 df_promo = df_promo.fillna("") 
                 
-                c_search, c_alimen, c_player = st.columns([2, 1, 1])
+                # --- AGGIUNTO IL FILTRO CLIENTE A 4 COLONNE ---
+                c_search, c_tipo, c_alimen, c_player = st.columns([2, 1, 1, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
+                with c_tipo:
+                    if 'TIPOLOGIA CLIENTE' in df_promo.columns:
+                        lista_tipi = ["Tutti"] + sorted(list(set([str(x).upper() for x in df_promo['TIPOLOGIA CLIENTE'].unique() if str(x).strip()])))
+                        filtro_tipo = st.selectbox("👤 Cliente", lista_tipi)
+                    else:
+                        filtro_tipo = "Tutti"
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
-                        lista_alimen = ["Tutte"] + sorted([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])
+                        lista_alimen = ["Tutte"] + sorted(list(set([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])))
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
                     else:
                         filtro_alimen = "Tutte"
                 with c_player:
                     if 'PLAYER' in df_promo.columns:
-                        lista_player = ["Tutti"] + sorted([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])
+                        lista_player = ["Tutti"] + sorted(list(set([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])))
                         filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
                     else:
                         filtro_player = "Tutti"
@@ -456,6 +468,8 @@ if check_password():
                     offerta_tipo = str(row.get('OFFERTA', '')).strip()
                     player = str(row.get('PLAYER', '')).strip().upper()
                     commissioni = str(row.get('COMMISSIONI', '')).strip()
+                    tipo_cliente_off = str(row.get('TIPOLOGIA CLIENTE', '')).strip().upper() if 'TIPOLOGIA CLIENTE' in df_promo.columns else ""
+                    
                     link_raw = str(row.get('LINK OFFERTA', '')).strip() if 'LINK OFFERTA' in df_promo.columns else str(row.get('link offerta', '')).strip()
                     link_valido = link_raw if link_raw.startswith("http") else ("https://" + link_raw if link_raw.startswith("www") else "")
                     
@@ -471,11 +485,21 @@ if check_password():
                     if ricerca and ricerca not in marca and ricerca not in modello.upper(): continue
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
                     if filtro_player != "Tutti" and player != filtro_player: continue
+                    
+                    # Logica Intelligente Filtro Cliente (Se cerco PRIVATO o PARTITA IVA, mi mostra anche ENTRAMBI)
+                    if filtro_tipo != "Tutti":
+                        if filtro_tipo == "PRIVATO" and tipo_cliente_off == "ENTRAMBI":
+                            pass # mostra
+                        elif filtro_tipo == "PARTITA IVA" and tipo_cliente_off == "ENTRAMBI":
+                            pass # mostra
+                        elif tipo_cliente_off != filtro_tipo:
+                            continue
                         
                     offerte_filtrate.append({
                         "marca": marca, "modello": modello, "canone": canone, 
                         "anticipo": anticipo, "durata": mesi, "km_totali": km,
-                        "tipo": offerta_tipo, "player": player, "comm": commissioni, "link": link_valido
+                        "tipo": offerta_tipo, "player": player, "comm": commissioni, 
+                        "link": link_valido, "tipologia_cliente": tipo_cliente_off
                     })
                 
                 offerte_filtrate = sorted(offerte_filtrate, key=lambda x: x['canone'])
@@ -501,6 +525,7 @@ if check_password():
                                 <p style="font-size: 13px; color: #BBB; line-height: 1.4; margin-bottom: 5px;">
                                     🏢 <b>Player:</b> {auto['player']}<br>
                                     🏷️ <b>Tipo:</b> {auto['tipo']}<br>
+                                    👤 <b>Cliente:</b> {auto['tipologia_cliente']}<br>
                                     💶 <b>Commissioni:</b> {auto['comm']}
                                 </p>
                                 {link_html}
@@ -842,4 +867,3 @@ if check_password():
                     pdf.output("preventivo_multiplo.pdf")
                     with open("preventivo_multiplo.pdf", "rb") as f:
                         st.download_button("📩 SCARICA PREVENTIVO", f, "Offerta.pdf", key="dl_multi")
-
