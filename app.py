@@ -65,74 +65,55 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API (OTTIMIZZATA) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO MERCATO EUROPEO (IMAGIN.STUDIO) ---
 def scarica_foto_auto_api(marca, versione):
-    # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE
-    CARSXE_API_KEY = "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE"
-    
-    if not CARSXE_API_KEY or CARSXE_API_KEY == "j8j4go0fx_wdw4h58n5_ydn6f4mk8":
-        st.warning("⚠️ Diagnostica: Inserisci la tua chiave API di CarsXE nel codice.")
-        return None
-
-    # Pulizia stringhe: CarsXE ha bisogno di marca e modello perfetti
-    marca_clean = str(marca).strip().title()
+    # Pulizia stringhe per Imagin.studio (vuole tutto minuscolo e pulito)
+    marca_clean = str(marca).strip().lower()
     parti_versione = str(versione).strip().split()
-    modello_clean = parti_versione[0].title() if parti_versione else ""
+    modello_clean = parti_versione[0].lower() if parti_versione else ""
     
-    # Salviamo la cache basandoci solo su Marca e Modello (così non duplica foto uguali)
-    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}.png".replace(" ", "_").replace("/", "_").lower()
+    # Costruiamo il nome del file per la cache
+    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}.png".replace(" ", "_").replace("/", "_")
     
     # 1. Controlla prima nella cache
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto di {marca_clean} {modello_clean} recuperata dalla Memoria!")
+            st.toast(f"⚡ Foto di {marca_clean.title()} recuperata dalla Memoria Cache!")
             return f.read()
 
-    # 2. Richiesta a CarsXE
-    url_api = "https://api.carsxe.com/images"
-    
-    # PARAMETRI OTTIMIZZATI: Tolto l'anno, così pesca in automatico l'ultima versione disponibile
-    parametri = {
-        "key": CARSXE_API_KEY,
-        "make": marca_clean,
-        "model": modello_clean,
-        "color": "white",
-        "angle": "front",
-        "transparent": "true",
-        "format": "png"
-    }
+    # 2. Richiesta a Imagin.studio (Customer = demo per test gratuiti)
+    # angle=23 è il codice esatto per l'inquadratura 3/4 anteriore
+    # paintId=pspc0004 è un colore bianco/grigio chiaro neutro
+    url_api = f"https://cdn.imagin.studio/getImage?customer=demo&make={marca_clean}&modelFamily={modello_clean}&angle=23&paintId=pspc0004&zoomType=fullscreen"
     
     try:
-        risposta = requests.get(url_api, params=parametri, timeout=10)
+        # Usiamo il "travestimento" da browser
+        headers_browser = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
         
-        if risposta.status_code == 200:
-            dati_json = risposta.json()
+        # Imagin.studio ci restituisce *direttamente* la foto, non un testo!
+        risposta_foto = requests.get(url_api, headers=headers_browser, timeout=10)
+        
+        # Se la risposta è 200 e il contenuto è un'immagine
+        if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
             
-            link_foto = None
-            if "images" in dati_json and len(dati_json["images"]) > 0:
-                link_foto = dati_json["images"][0].get("link") if isinstance(dati_json["images"][0], dict) else dati_json["images"][0]
-            elif "imageUrl" in dati_json:
-                link_foto = dati_json["imageUrl"]
-            elif "image" in dati_json:
-                link_foto = dati_json["image"]
-                
-            if link_foto and isinstance(link_foto, str) and "http" in link_foto:
-                try:
-                    headers_browser = {"User-Agent": "Mozilla/5.0"}
-                    risposta_foto = requests.get(link_foto, headers=headers_browser, timeout=5)
-                    if risposta_foto.status_code == 200:
-                        with open(nome_file_cache, "wb") as f:
-                            f.write(risposta_foto.content)
-                        st.success(f"✅ FOTO CARSXE: {marca_clean} {modello_clean} trovata!")
-                        return risposta_foto.content
-                except:
-                    pass
-            st.warning(f"⚠️ CarsXE non ha in archivio la foto a 3/4 per la {marca_clean} {modello_clean}.")
+            # Imagin.studio a volte restituisce l'immagine di un'auto coperta da un telo se non la trova.
+            # Ma nella maggior parte dei casi restituisce l'auto perfetta.
+            with open(nome_file_cache, "wb") as f:
+                f.write(risposta_foto.content)
+            st.success(f"✅ FOTO EUROPEA: {marca_clean.title()} {modello_clean.title()} trovata!")
+            return risposta_foto.content
+            
         else:
-            st.error(f"🛑 ERRORE API CARSXE: {risposta.text}")
+            st.warning(f"⚠️ Imagin.studio non ha ancora l'immagine a 3/4 per la {marca_clean.title()} {modello_clean.title()}.")
+            import time
+            time.sleep(3)
             
     except Exception as e:
-        st.error(f"❌ Errore di rete a CarsXE: {e}")
+        st.error(f"❌ Errore di connessione a Imagin.studio: {e}")
+        import time
+        time.sleep(3)
         
     return None
 # --- REGISTRAZIONE STATISTICHE ---
