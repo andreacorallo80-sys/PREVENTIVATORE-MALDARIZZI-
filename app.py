@@ -65,22 +65,23 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API (PARAMETRI RIGIDI) ---
 def scarica_foto_auto_api(marca, versione):
     # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE
-    CARSXE_API_KEY = "j8j4go0fx_wdw4h58n5_ydn6f4mk8"
+    CARSXE_API_KEY = "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE"
     
     if not CARSXE_API_KEY or CARSXE_API_KEY == "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE":
         st.warning("⚠️ Diagnostica: Inserisci la tua chiave API di CarsXE nel codice.")
         return None
 
-    # Pulizia stringhe
+    # Pulizia stringhe: CarsXE ha bisogno di marca e modello puliti
     marca_clean = str(marca).strip().title()
     parti_versione = str(versione).strip().split()
     modello_clean = parti_versione[0].title() if parti_versione else ""
     trim_clean = " ".join(parti_versione[1:]).title() if len(parti_versione) > 1 else ""
     
-    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
+    # Salviamo in .png per mantenere la trasparenza dello sfondo
+    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.png".replace(" ", "_").replace("/", "_").lower()
     
     # 1. Controlla prima nella cache
     if os.path.exists(nome_file_cache):
@@ -91,14 +92,16 @@ def scarica_foto_auto_api(marca, versione):
     # 2. Richiesta a CarsXE
     url_api = "https://api.carsxe.com/images"
     
+    # I PARAMETRI UFFICIALI CARSXE PER IL 3/4 SCONTORNATO
     parametri = {
         "key": CARSXE_API_KEY,
         "make": marca_clean,
         "model": modello_clean,
-        "transparent": "true",  # Forza lo sfondo scontornato/bianco
-        "angle": "front-cross"  # Forza l'inquadratura esterna a 3/4
-        # Nota: non forzo l'anno per evitare che scarti le auto di cui non trova il modello del 2024/2025. 
-        # Di base CarsXE restituisce sempre la foto della versione più recente in database.
+        "year": "2024",         # Forza la versione più recente
+        "color": "white",       # Evita colori scuri che si fondono con le ombre
+        "angle": "front",       # È il parametro esatto di CarsXE per il 3/4 anteriore
+        "transparent": "true",  # Rimuove lo sfondo
+        "format": "png"         # Garantisce il mantenimento della trasparenza
     }
     
     try:
@@ -116,20 +119,20 @@ def scarica_foto_auto_api(marca, versione):
             elif "image" in dati_json:
                 link_foto = dati_json["image"]
                 
-            # Se ha trovato un link valido, lo scarica
+            # Se ha trovato un link valido, lo scarica simulando un browser
             if link_foto and isinstance(link_foto, str):
                 try:
-                    risposta_foto = requests.get(link_foto, timeout=5)
+                    headers_browser = {"User-Agent": "Mozilla/5.0"}
+                    risposta_foto = requests.get(link_foto, headers=headers_browser, timeout=5)
                     if risposta_foto.status_code == 200:
                         with open(nome_file_cache, "wb") as f:
                             f.write(risposta_foto.content)
-                        st.success("✅ FOTO CARSXE: Scaricata con successo (Scontornata a 3/4)!")
+                        st.success("✅ FOTO CARSXE: Scaricata in PNG a 3/4 Scontornata!")
                         return risposta_foto.content
                 except:
                     pass
-            st.warning(f"⚠️ CarsXE non ha trovato un'immagine a 3/4 scontornata per questo modello.")
+            st.warning(f"⚠️ CarsXE non ha trovato un'immagine a 3/4 per questo modello.")
         else:
-            # Stampa l'errore di CarsXE se la chiave è sbagliata o finiscono i crediti
             st.error(f"🛑 ERRORE API CARSXE: {risposta.text}")
             
     except Exception as e:
