@@ -65,43 +65,41 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API (PARAMETRI RIGIDI) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API (OTTIMIZZATA) ---
 def scarica_foto_auto_api(marca, versione):
     # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE
-    CARSXE_API_KEY = "j8j4go0fx_wdw4h58n5_ydn6f4mk8"
+    CARSXE_API_KEY = "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE"
     
     if not CARSXE_API_KEY or CARSXE_API_KEY == "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE":
         st.warning("⚠️ Diagnostica: Inserisci la tua chiave API di CarsXE nel codice.")
         return None
 
-    # Pulizia stringhe: CarsXE ha bisogno di marca e modello puliti
+    # Pulizia stringhe: CarsXE ha bisogno di marca e modello perfetti
     marca_clean = str(marca).strip().title()
     parti_versione = str(versione).strip().split()
     modello_clean = parti_versione[0].title() if parti_versione else ""
-    trim_clean = " ".join(parti_versione[1:]).title() if len(parti_versione) > 1 else ""
     
-    # Salviamo in .png per mantenere la trasparenza dello sfondo
-    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.png".replace(" ", "_").replace("/", "_").lower()
+    # Salviamo la cache basandoci solo su Marca e Modello (così non duplica foto uguali)
+    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}.png".replace(" ", "_").replace("/", "_").lower()
     
     # 1. Controlla prima nella cache
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto recuperata velocemente dalla Memoria (Costo: 0 API)")
+            st.toast(f"⚡ Foto di {marca_clean} {modello_clean} recuperata dalla Memoria!")
             return f.read()
 
     # 2. Richiesta a CarsXE
     url_api = "https://api.carsxe.com/images"
     
-    # I PARAMETRI UFFICIALI CARSXE PER IL 3/4 SCONTORNATO
+    # PARAMETRI OTTIMIZZATI: Tolto l'anno, così pesca in automatico l'ultima versione disponibile
     parametri = {
         "key": CARSXE_API_KEY,
         "make": marca_clean,
         "model": modello_clean,
-        "year": "2024",         # Forza la versione più recente
-        "color": "white",       # Evita colori scuri che si fondono con le ombre
-        "angle": "front",       # È il parametro esatto di CarsXE per il 3/4 anteriore
-        "transparent": "true",  # Rimuove lo sfondo
-        "format": "png"         # Garantisce il mantenimento della trasparenza
+        "color": "white",
+        "angle": "front",
+        "transparent": "true",
+        "format": "png"
     }
     
     try:
@@ -110,7 +108,6 @@ def scarica_foto_auto_api(marca, versione):
         if risposta.status_code == 200:
             dati_json = risposta.json()
             
-            # Caccia al link dell'immagine nel JSON di CarsXE
             link_foto = None
             if "images" in dati_json and len(dati_json["images"]) > 0:
                 link_foto = dati_json["images"][0].get("link") if isinstance(dati_json["images"][0], dict) else dati_json["images"][0]
@@ -119,24 +116,23 @@ def scarica_foto_auto_api(marca, versione):
             elif "image" in dati_json:
                 link_foto = dati_json["image"]
                 
-            # Se ha trovato un link valido, lo scarica simulando un browser
-            if link_foto and isinstance(link_foto, str):
+            if link_foto and isinstance(link_foto, str) and "http" in link_foto:
                 try:
                     headers_browser = {"User-Agent": "Mozilla/5.0"}
                     risposta_foto = requests.get(link_foto, headers=headers_browser, timeout=5)
                     if risposta_foto.status_code == 200:
                         with open(nome_file_cache, "wb") as f:
                             f.write(risposta_foto.content)
-                        st.success("✅ FOTO CARSXE: Scaricata in PNG a 3/4 Scontornata!")
+                        st.success(f"✅ FOTO CARSXE: {marca_clean} {modello_clean} trovata!")
                         return risposta_foto.content
                 except:
                     pass
-            st.warning(f"⚠️ CarsXE non ha trovato un'immagine a 3/4 per questo modello.")
+            st.warning(f"⚠️ CarsXE non ha in archivio la foto a 3/4 per la {marca_clean} {modello_clean}.")
         else:
             st.error(f"🛑 ERRORE API CARSXE: {risposta.text}")
             
     except Exception as e:
-        st.error(f"❌ Errore di rete/connessione a CarsXE: {e}")
+        st.error(f"❌ Errore di rete a CarsXE: {e}")
         
     return None
 # --- REGISTRAZIONE STATISTICHE ---
