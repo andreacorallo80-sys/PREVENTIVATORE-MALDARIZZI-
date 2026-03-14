@@ -754,7 +754,7 @@ if check_password():
                 versione_stampa = versione_sel
             
             opt_p = st.text_area("Optional Vettura", value=st.session_state.get("val_opt", ""), height=70)
-            foto_m = st.file_uploader("Foto Auto (Se vuoto usa GOOGLE API)", type=["jpg", "png", "jpeg"])
+            foto_m = st.file_uploader("Foto Auto (Se vuoto usa CarsXE)", type=["jpg", "png", "jpeg"])
 
         st.markdown("---")
         st.subheader("🛡️ Servizi e Penali")
