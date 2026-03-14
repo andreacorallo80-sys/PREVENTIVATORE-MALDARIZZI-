@@ -65,55 +65,58 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO MERCATO EUROPEO (IMAGIN.STUDIO) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO IMAGIN.STUDIO (ANTI-TELO ROSSO) ---
 def scarica_foto_auto_api(marca, versione):
-    # Pulizia stringhe per Imagin.studio (vuole tutto minuscolo e pulito)
-    marca_clean = str(marca).strip().lower()
-    parti_versione = str(versione).strip().split()
-    modello_clean = parti_versione[0].lower() if parti_versione else ""
+    # 1. Pulizia Marca (Imagin.studio vuole tutto minuscolo e senza spazi)
+    marca_clean = str(marca).strip().lower().replace(" ", "")
     
-    # Costruiamo il nome del file per la cache
-    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}.png".replace(" ", "_").replace("/", "_")
+    # 2. Pulizia Modello Estrema
+    versione_lower = str(versione).strip().lower()
+    parti_versione = versione_lower.split()
     
-    # 1. Controlla prima nella cache
+    if not parti_versione:
+        return None
+        
+    modello_clean = parti_versione[0]
+    
+    # Gestione modelli a due parole (es. Yaris Cross, 500 X, C5 Aircross)
+    if len(parti_versione) > 1:
+        seconda_parola = parti_versione[1]
+        if seconda_parola in ["cross", "aircross", "x", "l", "sport", "e"]:
+            modello_clean = f"{parti_versione[0]}{seconda_parola}"
+            
+    # Fix specifici per l'Italia
+    if modello_clean == "500e": modello_clean = "500"
+    if modello_clean == "pandina": modello_clean = "panda"
+    
+    nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}.png".replace("/", "_")
+    
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto di {marca_clean.title()} recuperata dalla Memoria Cache!")
+            st.toast(f"⚡ Foto di {marca.title()} recuperata dalla Memoria!")
             return f.read()
 
-    # 2. Richiesta a Imagin.studio (Customer = demo per test gratuiti)
-    # angle=23 è il codice esatto per l'inquadratura 3/4 anteriore
-    # paintId=pspc0004 è un colore bianco/grigio chiaro neutro
     url_api = f"https://cdn.imagin.studio/getImage?customer=demo&make={marca_clean}&modelFamily={modello_clean}&angle=23&paintId=pspc0004&zoomType=fullscreen"
     
     try:
-        # Usiamo il "travestimento" da browser
-        headers_browser = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        
-        # Imagin.studio ci restituisce *direttamente* la foto, non un testo!
+        headers_browser = {"User-Agent": "Mozilla/5.0"}
         risposta_foto = requests.get(url_api, headers=headers_browser, timeout=10)
         
-        # Se la risposta è 200 e il contenuto è un'immagine
-        if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
-            
-            # Imagin.studio a volte restituisce l'immagine di un'auto coperta da un telo se non la trova.
-            # Ma nella maggior parte dei casi restituisce l'auto perfetta.
+        if risposta.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
+            # SCUDO ANTI-TELO: Il telo rosso pesa circa 3-5 KB. Un'auto vera pesa dai 25 KB in su.
+            if len(risposta_foto.content) < 10000:
+                st.warning(f"⚠️ Imagin.studio non ha ancora il render 3D per {marca.title()} {modello_clean.title()}.")
+                import time
+                time.sleep(2)
+                return None
+                
             with open(nome_file_cache, "wb") as f:
                 f.write(risposta_foto.content)
-            st.success(f"✅ FOTO EUROPEA: {marca_clean.title()} {modello_clean.title()} trovata!")
+            st.success(f"✅ FOTO EUROPEA: {marca.title()} {modello_clean.title()} trovata e scontornata!")
             return risposta_foto.content
             
-        else:
-            st.warning(f"⚠️ Imagin.studio non ha ancora l'immagine a 3/4 per la {marca_clean.title()} {modello_clean.title()}.")
-            import time
-            time.sleep(3)
-            
     except Exception as e:
-        st.error(f"❌ Errore di connessione a Imagin.studio: {e}")
-        import time
-        time.sleep(3)
+        st.error(f"❌ Errore API Imagin.studio: {e}")
         
     return None
 # --- REGISTRAZIONE STATISTICHE ---
