@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 import re
@@ -436,25 +436,40 @@ if check_password():
                 df_promo = pd.concat(df_list, ignore_index=True)
                 df_promo = df_promo.fillna("") 
                 
-                # --- AGGIUNTO IL FILTRO CLIENTE A 4 COLONNE ---
+                # --- FILTRO CLIENTE A 4 COLONNE CORRETTO E BLINDATO ---
                 c_search, c_tipo, c_alimen, c_player = st.columns([2, 1, 1, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
+                
                 with c_tipo:
                     if 'TIPOLOGIA CLIENTE' in df_promo.columns:
-                        lista_tipi = ["Tutti"] + sorted(list(set([str(x).upper() for x in df_promo['TIPOLOGIA CLIENTE'].unique() if str(x).strip()])))
+                        tipi_validi = set()
+                        for x in df_promo['TIPOLOGIA CLIENTE'].unique():
+                            if str(x).strip() and str(x).upper().strip() != 'NAN':
+                                tipi_validi.add(str(x).upper().strip())
+                        lista_tipi = ["Tutti"] + sorted(list(tipi_validi))
                         filtro_tipo = st.selectbox("👤 Cliente", lista_tipi)
                     else:
                         filtro_tipo = "Tutti"
+                
                 with c_alimen:
                     if 'ALIMENTAZIONE' in df_promo.columns:
-                        lista_alimen = ["Tutte"] + sorted(list(set([str(x).upper() for x in df_promo['ALIMENTAZIONE'].unique() if str(x).strip()])))
+                        alim_valide = set()
+                        for x in df_promo['ALIMENTAZIONE'].unique():
+                            if str(x).strip() and str(x).upper().strip() != 'NAN':
+                                alim_valide.add(str(x).upper().strip())
+                        lista_alimen = ["Tutte"] + sorted(list(alim_valide))
                         filtro_alimen = st.selectbox("⚡ Alimentazione", lista_alimen)
                     else:
                         filtro_alimen = "Tutte"
+                        
                 with c_player:
                     if 'PLAYER' in df_promo.columns:
-                        lista_player = ["Tutti"] + sorted(list(set([str(x).upper() for x in df_promo['PLAYER'].unique() if str(x).strip()])))
+                        player_validi = set()
+                        for x in df_promo['PLAYER'].unique():
+                            if str(x).strip() and str(x).upper().strip() != 'NAN':
+                                player_validi.add(str(x).upper().strip())
+                        lista_player = ["Tutti"] + sorted(list(player_validi))
                         filtro_player = st.selectbox("🏢 Noleggiatore", lista_player)
                     else:
                         filtro_player = "Tutti"
@@ -486,12 +501,12 @@ if check_password():
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
                     if filtro_player != "Tutti" and player != filtro_player: continue
                     
-                    # Logica Intelligente Filtro Cliente (Se cerco PRIVATO o P.IVA, mi mostra anche ENTRAMBI)
+                    # LOGICA INTELLIGENTE FILTRO CLIENTE
                     if filtro_tipo != "Tutti":
                         if filtro_tipo == "PRIVATO" and tipo_cliente_off == "ENTRAMBI":
-                            pass # mostra
-                        elif filtro_tipo == "P.IVA" and tipo_cliente_off == "ENTRAMBI":
-                            pass # mostra
+                            pass # Mostra
+                        elif filtro_tipo == "PARTITA IVA" and tipo_cliente_off == "ENTRAMBI":
+                            pass # Mostra
                         elif tipo_cliente_off != filtro_tipo:
                             continue
                         
@@ -852,12 +867,33 @@ if check_password():
                         
                         pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
 
-                        if p.get('opt'):
-                            pdf.ln(2); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(201, 188, 65); pdf.cell(0, 6, "OPTIONAL INCLUSI", ln=True, align="C")
-                            pdf.set_font(pdf.f_f, "", 8); pdf.set_text_color(255, 255, 255); pdf.multi_cell(0, 4, pulisci_testo(p['opt']), align="C")
+                        # --- FIX: STAMPA DEGLI OPTIONAL BLINDATA ---
+                        testo_opt = str(p.get('opt', '')).strip()
+                        if testo_opt:
+                            pdf.ln(2)
+                            pdf.set_font(pdf.f_f, "B", 10)
+                            pdf.set_text_color(201, 188, 65)
+                            pdf.cell(0, 5, "OPTIONAL INCLUSI", ln=True, align="C")
+                            pdf.set_font(pdf.f_f, "", 8)
+                            pdf.set_text_color(255, 255, 255)
+                            pdf.multi_cell(0, 4, pulisci_testo(testo_opt), align="C")
 
-                        pdf.ln(3); pdf.set_font(pdf.f_f, "I", 8); pdf.set_text_color(180, 180, 180)
-                        pdf.multi_cell(0, 4, f"*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.\n*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: {g_validita} giorni.", align="C")
+                        # --- FIX: STAMPA DELLE NOTE AGGIUNTIVE ---
+                        testo_note = str(p.get('note', '')).strip()
+                        if testo_note:
+                            pdf.ln(2)
+                            pdf.set_font(pdf.f_f, "B", 10)
+                            pdf.set_text_color(201, 188, 65)
+                            pdf.cell(0, 5, "NOTE AGGIUNTIVE", ln=True, align="C")
+                            pdf.set_font(pdf.f_f, "", 8)
+                            pdf.set_text_color(255, 255, 255)
+                            pdf.multi_cell(0, 4, pulisci_testo(testo_note), align="C")
+
+                        # DISCLAIMER E FOOTER
+                        pdf.ln(4)
+                        pdf.set_font(pdf.f_f, "I", 7)
+                        pdf.set_text_color(180, 180, 180)
+                        pdf.multi_cell(0, 3, f"*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.\n*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: {g_validita} giorni.", align="C")
                         
                         pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
                         pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
