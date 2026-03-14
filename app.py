@@ -65,10 +65,14 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO IMAGIN.STUDIO (ANTI-TELO ROSSO) ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO IMAGIN.STUDIO (ANTI-TELO ROSSO POTENZIATO) ---
 def scarica_foto_auto_api(marca, versione):
-    # 1. Pulizia Marca (Imagin.studio vuole tutto minuscolo e senza spazi)
+    # 1. Pulizia Marca
     marca_clean = str(marca).strip().lower().replace(" ", "")
+    
+    # Fix specifici per marchi composti che Imagin.studio vuole col trattino
+    if marca_clean == "alfaromeo": marca_clean = "alfa-romeo"
+    if marca_clean == "landrover": marca_clean = "land-rover"
     
     # 2. Pulizia Modello Estrema
     versione_lower = str(versione).strip().lower()
@@ -79,10 +83,10 @@ def scarica_foto_auto_api(marca, versione):
         
     modello_clean = parti_versione[0]
     
-    # Gestione modelli a due parole (es. Yaris Cross, 500 X, C5 Aircross)
+    # Gestione modelli a due parole
     if len(parti_versione) > 1:
         seconda_parola = parti_versione[1]
-        if seconda_parola in ["cross", "aircross", "x", "l", "sport", "e"]:
+        if seconda_parola in ["cross", "aircross", "x", "l", "sport", "e", "rover", "countryman"]:
             modello_clean = f"{parti_versione[0]}{seconda_parola}"
             
     # Fix specifici per l'Italia
@@ -91,10 +95,17 @@ def scarica_foto_auto_api(marca, versione):
     
     nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}.png".replace("/", "_")
     
+    # 1. Controllo Cache con AUTOPULIZIA del telo rosso
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto di {marca.title()} recuperata dalla Memoria!")
-            return f.read()
+            dati_foto = f.read()
+            # Se la foto in memoria pesa meno di 40KB, è un telo rosso salvato per sbaglio! Lo distruggiamo.
+            if len(dati_foto) > 40000:
+                st.toast(f"⚡ Foto di {marca.title()} recuperata dalla Memoria!")
+                return dati_foto
+            
+        # Se era un telo rosso, eliminalo dalla cache
+        os.remove(nome_file_cache)
 
     url_api = f"https://cdn.imagin.studio/getImage?customer=demo&make={marca_clean}&modelFamily={modello_clean}&angle=23&paintId=pspc0004&zoomType=fullscreen"
     
@@ -103,9 +114,10 @@ def scarica_foto_auto_api(marca, versione):
         risposta_foto = requests.get(url_api, headers=headers_browser, timeout=10)
         
         if risposta.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
-            # SCUDO ANTI-TELO: Il telo rosso pesa circa 3-5 KB. Un'auto vera pesa dai 25 KB in su.
-            if len(risposta_foto.content) < 10000:
-                st.warning(f"⚠️ Imagin.studio non ha ancora il render 3D per {marca.title()} {modello_clean.title()}.")
+            
+            # SCUDO ANTI-TELO FINALE: Scarta tutto ciò che è sotto i 40KB
+            if len(risposta_foto.content) < 40000:
+                st.warning(f"⚠️ Imagin.studio non ha il render esatto per {marca.title()} {modello_clean.title()} (Immagine generica scartata).")
                 import time
                 time.sleep(2)
                 return None
