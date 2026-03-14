@@ -70,6 +70,9 @@ def show_bananas():
 def scarica_foto_auto_api(marca, versione):
     GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
     GOOGLE_CX = "419da089f0736400f"
+    <script async src="https://cse.google.com/cse.js?cx=419da089f0736400f">
+</script>
+<div class="gcse-search"></div>
     
     if GOOGLE_API_KEY == "inserisci qui la tua chiave api":
         st.warning("⚠️ Diagnostica: Inserisci le chiavi di Google nel codice.")
