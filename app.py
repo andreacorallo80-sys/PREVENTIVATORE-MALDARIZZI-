@@ -68,7 +68,7 @@ def show_bananas():
 # --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API (PARAMETRI RIGIDI) ---
 def scarica_foto_auto_api(marca, versione):
     # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE
-    CARSXE_API_KEY = "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE"
+    CARSXE_API_KEY = "j8j4go0fx_wdw4h58n5_ydn6f4mk8"
     
     if not CARSXE_API_KEY or CARSXE_API_KEY == "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE":
         st.warning("⚠️ Diagnostica: Inserisci la tua chiave API di CarsXE nel codice.")
