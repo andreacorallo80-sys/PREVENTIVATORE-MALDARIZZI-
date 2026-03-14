@@ -65,12 +65,13 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI ---
+# --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI (CORAZZATA E DIAGNOSTICA) ---
 def scarica_foto_auto_api(marca, versione):
+    # ⚠️ ATTENZIONE: Se hai creato le tue chiavi personali, incollale qui sotto!
     GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
     GOOGLE_CX = "419da089f0736400f"
     
-    if GOOGLE_API_KEY == "inserisci qui la tua chiave api":
+    if not GOOGLE_API_KEY or GOOGLE_API_KEY == "inserisci qui la tua chiave api":
         st.warning("⚠️ Diagnostica: Inserisci le chiavi di Google nel codice.")
         return None
 
@@ -83,7 +84,7 @@ def scarica_foto_auto_api(marca, versione):
     
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto recuperata dalla Memoria Interna! (Costo: 0)")
+            st.toast(f"⚡ Foto recuperata dalla Memoria Interna!")
             return f.read()
 
     url_api = "https://www.googleapis.com/customsearch/v1"
@@ -94,8 +95,15 @@ def scarica_foto_auto_api(marca, versione):
         "searchType": "image", "imgSize": "LARGE", "num": 3
     }
     
+    # IL FAMOSO "TRAVESTIMENTO" DA BROWSER UMANO
+    headers_browser = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
     try:
-        risposta = requests.get(url_api, params=parametri, timeout=10)
+        # Usiamo il travestimento anche per la ricerca su Google
+        risposta = requests.get(url_api, params=parametri, headers=headers_browser, timeout=10)
+        
         if risposta.status_code == 200:
             dati_json = risposta.json()
             if "items" in dati_json and len(dati_json["items"]) > 0:
@@ -103,14 +111,25 @@ def scarica_foto_auto_api(marca, versione):
                     link_foto = item.get("link")
                     if link_foto:
                         try:
-                            risposta_foto = requests.get(link_foto, timeout=5)
+                            # Usiamo il travestimento per scaricare la foto dal sito
+                            risposta_foto = requests.get(link_foto, headers=headers_browser, timeout=5)
                             if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
                                 with open(nome_file_cache, "wb") as f:
                                     f.write(risposta_foto.content)
-                                st.success("✅ FOTO GOOGLE: Scaricata e salvata in Memoria!")
+                                st.success("✅ FOTO GOOGLE: Scaricata con successo!")
                                 return risposta_foto.content
                         except: continue
-    except Exception: pass
+                st.error("❌ Google ha trovato foto, ma i siti proprietari bloccano il download.")
+            else:
+                st.warning(f"⚠️ Google non ha trovato immagini per l'auto richiesta.")
+        else:
+            # SE GOOGLE CI BLOCCA, STAMPA IL VERO ERRORE
+            messaggio_errore = risposta.json().get('error', {}).get('message', 'Errore Sconosciuto')
+            st.error(f"🛑 ERRORE API GOOGLE: {messaggio_errore}")
+            
+    except Exception as e:
+        st.error(f"❌ Errore di rete/connessione: {e}")
+        
     return None
 
 # --- REGISTRAZIONE STATISTICHE ---
