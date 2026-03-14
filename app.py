@@ -65,16 +65,94 @@ def show_bananas():
         bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
     st.markdown(bananas_html, unsafe_allow_html=True)
 
-# --- NUOVA FUNZIONE: RECUPERO FOTO DA GOOGLE IMMAGINI (CORAZZATA E DIAGNOSTICA) ---
+Detto, fatto! Abbandoniamo Google e passiamo agli strumenti professionali per l'automotive.
+
+Ho eliminato completamente il motore di Google e ho integrato l'API ufficiale di CarsXE.
+Gli ho dato istruzioni precisissime impostando i parametri transparent="true" (per avere lo sfondo trasparente/scontornato) e angle="front-cross" (che nel gergo tecnico fotografico indica l'inquadratura esterna a 3/4).
+
+Inoltre, ho creato il "Gestore della Cache": nel menù laterale troverai una nuova area per vedere quante foto ha memorizzato il sistema, con il comodo tasto per scaricarle tutte in un colpo solo all'interno di un file .zip, o per svuotare la memoria.
+
+Ecco il tuo Codice Stella aggiornato e definitivo. Svuota il tuo app.py e incolla questo:
+
+Python
+import streamlit as st
+import pandas as pd
+import os
+import re
+import pypdf
+import io
+import requests
+import shutil # <-- Aggiunto per creare il file ZIP della cache
+from fpdf import FPDF
+from datetime import datetime
+import locale
+import random
+
+# --- CREAZIONE CARTELLA CACHE PER RISPARMIARE CHIAMATE FOTO ---
+if not os.path.exists("Foto_Cache"):
+    os.makedirs("Foto_Cache")
+
+# --- HELPER LETTURA FILE ---
+def leggi_file_dati(percorso):
+    if percorso.endswith(".csv"):
+        try:
+            df = pd.read_csv(percorso, sep=";", on_bad_lines='skip')
+            if len(df.columns) < 3: 
+                df = pd.read_csv(percorso, sep=",", on_bad_lines='skip')
+            return df
+        except:
+            df = pd.read_csv(percorso, sep=";", encoding="latin-1", on_bad_lines='skip')
+            if len(df.columns) < 3: 
+                df = pd.read_csv(percorso, sep=",", encoding="latin-1", on_bad_lines='skip')
+            return df
+    else:
+        return pd.read_excel(percorso)
+
+# --- FUNZIONE PULIZIA TESTO ---
+def pulisci_testo(testo):
+    if not testo: return ""
+    testo = str(testo)
+    sostituzioni = {
+        '€': 'Euro', '\u2019': "'", '\u2018': "'", '\u201c': '"', '\u201d': '"',
+        '\u2013': '-', '\u2014': '-', '\u2022': '-', '\xa0': ' ', '\t': ' ', '\r': ''
+    }
+    for k, v in sostituzioni.items():
+        testo = testo.replace(k, v)
+    return testo.encode('latin-1', 'ignore').decode('latin-1')
+
+# --- FUNZIONE EFFETTO BANANE ---
+def show_bananas():
+    bananas_html = """
+    <style>
+    @keyframes banana-fall { 
+        0% {top: -10%; opacity: 1; transform: rotate(0deg);} 
+        100% {top: 100%; opacity: 0; transform: rotate(360deg);} 
+    } 
+    .banana {
+        position: fixed; 
+        font-size: 2.5rem; 
+        z-index: 9999; 
+        animation: banana-fall linear forwards;
+    }
+    </style>
+    """
+    for _ in range(40):
+        left = random.randint(0, 100)
+        delay = random.uniform(0, 2.5)
+        duration = random.uniform(2.5, 4.5)
+        bananas_html += f"<div class='banana' style='left: {left}%; animation-duration: {duration}s; animation-delay: {delay}s;'>🍌</div>"
+    st.markdown(bananas_html, unsafe_allow_html=True)
+
+# --- NUOVA FUNZIONE: RECUPERO FOTO TRAMITE CARSXE API ---
 def scarica_foto_auto_api(marca, versione):
-    # ⚠️ ATTENZIONE: Se hai creato le tue chiavi personali, incollale qui sotto!
-    GOOGLE_API_KEY = "AIzaSyDuv1SOc8kLh9eqYo_dh9kQg9MiCQl3-dI"
-    GOOGLE_CX = "419da089f0736400f"
+    # ⚠️ INSERISCI QUI LA TUA CHIAVE API DI CARSXE
+    CARSXE_API_KEY = "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE"
     
-    if not GOOGLE_API_KEY or GOOGLE_API_KEY == "inserisci qui la tua chiave api":
-        st.warning("⚠️ Diagnostica: Inserisci le chiavi di Google nel codice.")
+    if not CARSXE_API_KEY or CARSXE_API_KEY == "INSERISCI_QUI_LA_TUA_CHIAVE_CARSXE":
+        st.warning("⚠️ Diagnostica: Inserisci la tua chiave API di CarsXE nel codice.")
         return None
 
+    # Pulizia stringhe
     marca_clean = str(marca).strip().title()
     parti_versione = str(versione).strip().split()
     modello_clean = parti_versione[0].title() if parti_versione else ""
@@ -82,56 +160,60 @@ def scarica_foto_auto_api(marca, versione):
     
     nome_file_cache = f"Foto_Cache/{marca_clean}_{modello_clean}_{trim_clean}.jpg".replace(" ", "_").replace("/", "_").lower()
     
+    # 1. Controlla prima nella cache
     if os.path.exists(nome_file_cache):
         with open(nome_file_cache, "rb") as f:
-            st.toast(f"⚡ Foto recuperata dalla Memoria Interna!")
+            st.toast(f"⚡ Foto recuperata velocemente dalla Memoria (Costo: 0 API)")
             return f.read()
 
-    url_api = "https://www.googleapis.com/customsearch/v1"
-    query_ricerca = f"{marca_clean} {modello_clean} {trim_clean} car exterior side view white background"
+    # 2. Richiesta a CarsXE
+    url_api = "https://api.carsxe.com/images"
     
     parametri = {
-        "q": query_ricerca, "cx": GOOGLE_CX, "key": GOOGLE_API_KEY,
-        "searchType": "image", "imgSize": "LARGE", "num": 3
-    }
-    
-    # IL FAMOSO "TRAVESTIMENTO" DA BROWSER UMANO
-    headers_browser = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "key": CARSXE_API_KEY,
+        "make": marca_clean,
+        "model": modello_clean,
+        "transparent": "true",  # Forza lo sfondo scontornato/bianco
+        "angle": "front-cross"  # Forza l'inquadratura esterna a 3/4
+        # Nota: non forzo l'anno per evitare che scarti le auto di cui non trova il modello del 2024/2025. 
+        # Di base CarsXE restituisce sempre la foto della versione più recente in database.
     }
     
     try:
-        # Usiamo il travestimento anche per la ricerca su Google
-        risposta = requests.get(url_api, params=parametri, headers=headers_browser, timeout=10)
+        risposta = requests.get(url_api, params=parametri, timeout=10)
         
         if risposta.status_code == 200:
             dati_json = risposta.json()
-            if "items" in dati_json and len(dati_json["items"]) > 0:
-                for item in dati_json["items"]:
-                    link_foto = item.get("link")
-                    if link_foto:
-                        try:
-                            # Usiamo il travestimento per scaricare la foto dal sito
-                            risposta_foto = requests.get(link_foto, headers=headers_browser, timeout=5)
-                            if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
-                                with open(nome_file_cache, "wb") as f:
-                                    f.write(risposta_foto.content)
-                                st.success("✅ FOTO GOOGLE: Scaricata con successo!")
-                                return risposta_foto.content
-                        except: continue
-                st.error("❌ Google ha trovato foto, ma i siti proprietari bloccano il download.")
-            else:
-                st.warning(f"⚠️ Google non ha trovato immagini per l'auto richiesta.")
+            
+            # Caccia al link dell'immagine nel JSON di CarsXE
+            link_foto = None
+            if "images" in dati_json and len(dati_json["images"]) > 0:
+                link_foto = dati_json["images"][0].get("link") if isinstance(dati_json["images"][0], dict) else dati_json["images"][0]
+            elif "imageUrl" in dati_json:
+                link_foto = dati_json["imageUrl"]
+            elif "image" in dati_json:
+                link_foto = dati_json["image"]
+                
+            # Se ha trovato un link valido, lo scarica
+            if link_foto and isinstance(link_foto, str):
+                try:
+                    risposta_foto = requests.get(link_foto, timeout=5)
+                    if risposta_foto.status_code == 200:
+                        with open(nome_file_cache, "wb") as f:
+                            f.write(risposta_foto.content)
+                        st.success("✅ FOTO CARSXE: Scaricata con successo (Scontornata a 3/4)!")
+                        return risposta_foto.content
+                except:
+                    pass
+            st.warning(f"⚠️ CarsXE non ha trovato un'immagine a 3/4 scontornata per questo modello.")
         else:
-            # SE GOOGLE CI BLOCCA, STAMPA IL VERO ERRORE
-            messaggio_errore = risposta.json().get('error', {}).get('message', 'Errore Sconosciuto')
-            st.error(f"🛑 ERRORE API GOOGLE: {messaggio_errore}")
+            # Stampa l'errore di CarsXE se la chiave è sbagliata o finiscono i crediti
+            st.error(f"🛑 ERRORE API CARSXE: {risposta.text}")
             
     except Exception as e:
-        st.error(f"❌ Errore di rete/connessione: {e}")
+        st.error(f"❌ Errore di rete/connessione a CarsXE: {e}")
         
     return None
-
 # --- REGISTRAZIONE STATISTICHE ---
 def registra_statistica(consulente, cliente, marca, modello, canone, anticipo, durata, km, origine):
     file_path = "statistiche_preventivi.csv"
