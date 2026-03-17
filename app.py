@@ -853,6 +853,7 @@ if check_password():
                         pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
                         pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
                         pdf.set_y(45); pdf.set_font(pdf.f_f, "B", 24); pdf.multi_cell(0, 10, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
+                        pdf.set_font(pdf.f_f, "B", 14); pdf.set_text_color(201, 188, 65); pdf.cell(0, 8, f"VEICOLO {str(p.get('t_veicolo', 'NUOVO')).upper()}", align="C", ln=True)
                         
                         if p.get("foto_bytes"):
                             f_path = f"tmp_multi_{i}.jpg" 
