@@ -1,4 +1,4 @@
-import streamlit as st
+ import streamlit as st
 import pandas as pd
 import os
 import re
@@ -113,7 +113,7 @@ def scarica_foto_auto_api(marca, versione):
         headers_browser = {"User-Agent": "Mozilla/5.0"}
         risposta_foto = requests.get(url_api, headers=headers_browser, timeout=10)
         
-        if risposta.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
+        if risposta_foto.status_code == 200 and "image" in risposta_foto.headers.get("Content-Type", ""):
             
             # SCUDO ANTI-TELO FINALE: Scarta tutto ciò che è sotto i 40KB
             if len(risposta_foto.content) < 40000:
@@ -131,6 +131,7 @@ def scarica_foto_auto_api(marca, versione):
         st.error(f"❌ Errore API Imagin.studio: {e}")
         
     return None
+
 # --- REGISTRAZIONE STATISTICHE ---
 def registra_statistica(consulente, cliente, marca, modello, canone, anticipo, durata, km, origine):
     file_path = "statistiche_preventivi.csv"
@@ -454,7 +455,6 @@ if check_password():
                 df_promo = pd.concat(df_list, ignore_index=True)
                 df_promo = df_promo.fillna("") 
                 
-                # --- FILTRO CLIENTE A 4 COLONNE CORRETTO E BLINDATO ---
                 c_search, c_tipo, c_alimen, c_player = st.columns([2, 1, 1, 1])
                 with c_search:
                     ricerca = st.text_input("🔍 Cerca per marca o modello...").upper()
@@ -519,12 +519,11 @@ if check_password():
                     if filtro_alimen != "Tutte" and alimen != filtro_alimen: continue
                     if filtro_player != "Tutti" and player != filtro_player: continue
                     
-                    # LOGICA INTELLIGENTE FILTRO CLIENTE
                     if filtro_tipo != "Tutti":
                         if filtro_tipo == "PRIVATO" and tipo_cliente_off == "ENTRAMBI":
-                            pass # Mostra
+                            pass
                         elif filtro_tipo == "PARTITA IVA" and tipo_cliente_off == "ENTRAMBI":
-                            pass # Mostra
+                            pass
                         elif tipo_cliente_off != filtro_tipo:
                             continue
                         
@@ -632,7 +631,6 @@ if check_password():
                 st.error(f"Errore caricamento database: {str(e)}")
         else:
             st.info("👈 Apri il menù 'CARICAMENTO DATABASE PROMO' nel menù laterale per inserire i file.")
-
 
     # ==========================================
     # SEZIONE 2: PREVENTIVATORE (VERTICALE)
@@ -852,8 +850,16 @@ if check_password():
                         pdf.add_page()
                         pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
                         pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
-                        pdf.set_y(45); pdf.set_font(pdf.f_f, "B", 24); pdf.multi_cell(0, 10, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
-                        pdf.set_font(pdf.f_f, "B", 12); pdf.set_text_color(201, 188, 65); pdf.cell(0, 6, f"VEICOLO {str(p.get('t_veicolo', 'NUOVO')).upper()}", align="C", ln=True)
+                        
+                        # --- STAMPA MARCA E VERSIONE (Alzato e rimpicciolito per evitare sovrapposizioni) ---
+                        pdf.set_y(36); pdf.set_font(pdf.f_f, "B", 22); pdf.multi_cell(0, 9, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
+                        
+                        # --- NUOVA RIGA: VEICOLO NUOVO/USATO (Centrato perfettamente) ---
+                        pdf.set_x(10) 
+                        pdf.set_font(pdf.f_f, "B", 12)
+                        pdf.set_text_color(201, 188, 65)
+                        stato_veicolo = str(p.get('t_veicolo', 'Nuovo')).upper()
+                        pdf.cell(0, 6, f"VEICOLO {stato_veicolo}", align="C", ln=True)
                         
                         if p.get("foto_bytes"):
                             f_path = f"tmp_multi_{i}.jpg" 
@@ -886,7 +892,7 @@ if check_password():
                         
                         pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
 
-                        # --- FIX: STAMPA DEGLI OPTIONAL BLINDATA ---
+                        # STAMPA DEGLI OPTIONAL
                         testo_opt = str(p.get('opt', '')).strip()
                         if testo_opt:
                             pdf.ln(2)
@@ -897,7 +903,7 @@ if check_password():
                             pdf.set_text_color(255, 255, 255)
                             pdf.multi_cell(0, 4, pulisci_testo(testo_opt), align="C")
 
-                        # --- FIX: STAMPA DELLE NOTE AGGIUNTIVE ---
+                        # STAMPA DELLE NOTE AGGIUNTIVE
                         testo_note = str(p.get('note', '')).strip()
                         if testo_note:
                             pdf.ln(2)
