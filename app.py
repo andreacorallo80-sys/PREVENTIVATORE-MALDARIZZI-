@@ -227,7 +227,7 @@ class MaldarizziPDF(FPDF):
         self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
     def header(self):
-        if os.path.exists("sfondo_nero.jpg"):
+        if os.path.exists("sfondo_nero.jpeg"):
             try: self.image("sfondo_nero.jpg", 0, 0, 210, 297)
             except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
         else: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
