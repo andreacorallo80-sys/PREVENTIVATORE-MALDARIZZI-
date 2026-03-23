@@ -227,20 +227,15 @@ class MaldarizziPDF(FPDF):
         self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
     def header(self):
-        # FIX: Aggiunta priorità al file .jpeg come richiesto
+        # FIX: Eliminati i Loghi di Maldarizzi Rent, rimane solo l'immagine di sfondo pulita.
         if os.path.exists("sfondo_nero.jpeg"):
             try: self.image("sfondo_nero.jpeg", 0, 0, 210, 297)
             except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
         elif os.path.exists("sfondo_nero.jpg"):
             try: self.image("sfondo_nero.jpg", 0, 0, 210, 297)
             except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
-        else: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
-
-        if os.path.exists("logo.png"):
-            try: self.image("logo.png", 5, 5, 45) 
-            except Exception: pass
-            try: self.image("logo.png", 145, 275, 55)
-            except Exception: pass
+        else: 
+            self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
 
 # --- CLASSE PDF FASCICOLO (ORIZZONTALE) ---
 class FascicoloPDF(FPDF):
@@ -855,73 +850,115 @@ if check_password():
                         
                         registra_statistica(nome_cons.upper(), p['cliente'], p['marca'], p['versione'], p['canone'], p['anticipo'], p['durata'], p['km'], p['origine_dati'])
                         pdf.add_page()
-                        pdf.set_y(20); pdf.set_font(pdf.f_f, "", 12); pdf.set_text_color(200, 200, 200); pdf.cell(0, 5, "Spettabile cliente:", align="C", ln=True)
-                        pdf.set_font(pdf.f_f, "B", 16); pdf.set_text_color(255, 255, 255); pdf.cell(0, 7, pulisci_testo(p['cliente'].upper()), align="C", ln=True)
                         
-                        # --- STAMPA MARCA E VERSIONE (Alzato e rimpicciolito per evitare sovrapposizioni) ---
-                        pdf.set_y(36); pdf.set_font(pdf.f_f, "B", 22); pdf.multi_cell(0, 9, pulisci_testo(f"{p['marca']} {p['versione']}"), align="C")
+                        # --- 1. DATI CLIENTE (In alto a Destra - Parte Nera) ---
+                        pdf.set_xy(110, 25)
+                        pdf.set_font(pdf.f_f, "", 12)
+                        pdf.set_text_color(200, 200, 200)
+                        pdf.cell(90, 5, "Spettabile cliente:", align="R", ln=True)
                         
-                        # --- NUOVA RIGA: VEICOLO NUOVO/USATO (Centrato perfettamente) ---
-                        pdf.set_x(10) 
+                        pdf.set_x(110)
+                        pdf.set_font(pdf.f_f, "B", 16)
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.cell(90, 7, pulisci_testo(p['cliente'].upper()), align="R", ln=True)
+                        
+                        # --- 2. DETTAGLI VEICOLO (Destra - Parte Nera) ---
+                        pdf.set_xy(110, 45)
+                        pdf.set_font(pdf.f_f, "B", 24)
+                        pdf.set_text_color(201, 188, 65) # ORO
+                        pdf.cell(90, 10, pulisci_testo(p['marca'].upper()), align="R", ln=True)
+                        
+                        pdf.set_x(110)
+                        pdf.set_font(pdf.f_f, "B", 16)
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.multi_cell(90, 7, pulisci_testo(p['versione']), align="R")
+                        
+                        pdf.set_x(110)
                         pdf.set_font(pdf.f_f, "B", 12)
-                        pdf.set_text_color(201, 188, 65)
+                        pdf.set_text_color(201, 188, 65) # ORO
                         stato_veicolo = str(p.get('t_veicolo', 'Nuovo')).upper()
-                        pdf.cell(0, 6, f"VEICOLO {stato_veicolo}", align="C", ln=True)
+                        pdf.cell(90, 8, f"VEICOLO {stato_veicolo}", align="R", ln=True)
                         
+                        # --- 3. PREZZO (In alto a Sinistra - Parte Grigia) ---
+                        pdf.set_xy(15, 95)
+                        pdf.set_font(pdf.f_f, "B", 45)
+                        pdf.set_text_color(201, 188, 65) # ORO
+                        canone_str = str(p['canone']).replace('.0','')
+                        pdf.cell(90, 15, pulisci_testo(f"Euro {canone_str}"), align="L", ln=True)
+                        
+                        pdf.set_x(16)
+                        pdf.set_font(pdf.f_f, "B", 16)
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.cell(90, 6, "/ mese", align="L", ln=True)
+                        
+                        # --- 4. FOTO AUTO (Sinistra / Basso - Parte Grigia) ---
                         if p.get("foto_bytes"):
                             f_path = f"tmp_multi_{i}.jpg" 
                             with open(f_path, "wb") as f: f.write(p["foto_bytes"])
-                            try: pdf.image(f_path, 25, pdf.get_y() + 2, 160)
-                            except Exception as e: st.error("L'immagine di Google ha un formato incompatibile col PDF.")
+                            try: 
+                                # Auto spostata in basso e a sinistra
+                                pdf.image(f_path, x=10, y=125, w=150)
+                            except Exception as e: 
+                                st.error("L'immagine ha un formato incompatibile col PDF.")
                         
-                        pdf.set_y(155); pdf.set_font(pdf.f_f, "B", 50); pdf.set_text_color(201, 188, 65)
-                        pdf.cell(0, 15, pulisci_testo(f"Euro {str(p['canone']).replace('.0','')} / mese"), align="C", ln=True)
-                        pdf.set_y(180); pdf.set_font(pdf.f_f, "B", 11); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(40, 40, 40)
+                        # --- 5. GRIGLIA DATI (Sotto l'auto, centrata o sx) ---
+                        pdf.set_y(195) 
+                        pdf.set_font(pdf.f_f, "B", 11)
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.set_fill_color(40, 40, 40)
                         
                         voci = [f"{p['durata']} mesi", f"Km {int(p['km']) * int(p['durata']) // 12}", f"Anticipo {str(p['anticipo']).replace('.0','')}", p['iva_text']]
-                        start_x = (210 - (42 * 4 + 4 * 3)) / 2
+                        start_x = 15 # Spostata a sx per allinearsi
                         for idx, voce in enumerate(voci):
-                            pdf.set_xy(start_x + (42 + 4) * idx, 180); pdf.cell(42, 10, pulisci_testo(voce), align="C", fill=True)
+                            pdf.set_xy(start_x + (38 + 3) * idx, 195)
+                            pdf.cell(38, 10, pulisci_testo(voce), align="C", fill=True)
                         
-                        pdf.set_y(202); pdf.set_font(pdf.f_f, "B", 11); pdf.set_x(10); pdf.cell(0, 6, "SERVIZI INCLUSI NEL CANONE", ln=True, align="C")
-                        pdf.set_font(pdf.f_f, "", 9)
+                        # --- 6. SERVIZI, OPTIONAL, NOTE (In Basso a Destra - Parte Nera) ---
+                        pdf.set_xy(110, 215)
+                        pdf.set_font(pdf.f_f, "B", 11)
+                        pdf.set_text_color(201, 188, 65) # ORO
+                        pdf.cell(90, 6, "SERVIZI INCLUSI", ln=True, align="R")
                         
+                        pdf.set_x(110)
+                        pdf.set_font(pdf.f_f, "", 8)
+                        pdf.set_text_color(255, 255, 255)
                         serv_list = [
                             f"RCA (Franchigia {p['p_rca']})", 
                             f"Incendio/Furto (Franchigia {p['p_if']})", 
                             f"Danni/Kasko (Franchigia {p['p_kasko']})", 
-                            "Manutenzione Ordinaria/Straordinaria", 
+                            "Manutenzione Ordinaria", 
                             "Assistenza Stradale H24"
                         ]
                         if p.get('g_num'): serv_list.append(f"Gomme: {p['g_num']}")
-                        if p.get('infort'): serv_list.append("Infortunio Conducente (PAI)")
-                        if p.get('vett_sost'): serv_list.append(f"Vettura Sostitutiva ({p['vett_sost']})")
-                        
-                        pdf.set_x(10); pdf.multi_cell(0, 5, pulisci_testo(" | ".join(serv_list)), align="C")
+                        if p.get('infort'): serv_list.append("PAI")
+                        if p.get('vett_sost'): serv_list.append(f"Vettura Sostitutiva")
+                        pdf.multi_cell(90, 4, pulisci_testo(" | ".join(serv_list)), align="R")
 
-                        # STAMPA DEGLI OPTIONAL
                         testo_opt = str(p.get('opt', '')).strip()
                         if testo_opt:
                             pdf.ln(2)
+                            pdf.set_x(110)
                             pdf.set_font(pdf.f_f, "B", 10)
                             pdf.set_text_color(201, 188, 65)
-                            pdf.cell(0, 5, "OPTIONAL INCLUSI", ln=True, align="C")
+                            pdf.cell(90, 5, "OPTIONAL INCLUSI", ln=True, align="R")
+                            pdf.set_x(110)
                             pdf.set_font(pdf.f_f, "", 8)
                             pdf.set_text_color(255, 255, 255)
-                            pdf.multi_cell(0, 4, pulisci_testo(testo_opt), align="C")
+                            pdf.multi_cell(90, 4, pulisci_testo(testo_opt), align="R")
 
-                        # STAMPA DELLE NOTE AGGIUNTIVE
                         testo_note = str(p.get('note', '')).strip()
                         if testo_note:
                             pdf.ln(2)
+                            pdf.set_x(110)
                             pdf.set_font(pdf.f_f, "B", 10)
                             pdf.set_text_color(201, 188, 65)
-                            pdf.cell(0, 5, "NOTE AGGIUNTIVE", ln=True, align="C")
+                            pdf.cell(90, 5, "NOTE AGGIUNTIVE", ln=True, align="R")
+                            pdf.set_x(110)
                             pdf.set_font(pdf.f_f, "", 8)
                             pdf.set_text_color(255, 255, 255)
-                            pdf.multi_cell(0, 4, pulisci_testo(testo_note), align="C")
+                            pdf.multi_cell(90, 4, pulisci_testo(testo_note), align="R")
 
-                        # --- FIX: DISCLAIMER E FOOTER ANCORATI AL FONDO ---
+                        # --- 7. DISCLAIMER E FOOTER (In Basso Centrato) ---
                         pdf.set_y(265)
                         pdf.set_font(pdf.f_f, "I", 7)
                         pdf.set_text_color(180, 180, 180)
