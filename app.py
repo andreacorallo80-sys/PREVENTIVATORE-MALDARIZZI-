@@ -227,7 +227,11 @@ class MaldarizziPDF(FPDF):
         self.f_f = "Rubik" if os.path.exists("Rubik-Light.ttf") else "Arial"
 
     def header(self):
+        # FIX: Aggiunta priorità al file .jpeg come richiesto
         if os.path.exists("sfondo_nero.jpeg"):
+            try: self.image("sfondo_nero.jpeg", 0, 0, 210, 297)
+            except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
+        elif os.path.exists("sfondo_nero.jpg"):
             try: self.image("sfondo_nero.jpg", 0, 0, 210, 297)
             except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
         else: self.set_fill_color(20, 20, 20); self.rect(0, 0, 210, 297, 'F')
@@ -251,6 +255,9 @@ class FascicoloPDF(FPDF):
     def header(self):
         if os.path.exists("sfondo nero orizz.jpg"):
             try: self.image("sfondo nero orizz.jpg", 0, 0, 297, 210)
+            except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 297, 210, 'F')
+        elif os.path.exists("sfondo_nero.jpeg"):
+            try: self.image("sfondo_nero.jpeg", 0, 0, 297, 210)
             except Exception: self.set_fill_color(20, 20, 20); self.rect(0, 0, 297, 210, 'F')
         elif os.path.exists("sfondo_nero.jpg"):
             try: self.image("sfondo_nero.jpg", 0, 0, 297, 210)
@@ -914,15 +921,18 @@ if check_password():
                             pdf.set_text_color(255, 255, 255)
                             pdf.multi_cell(0, 4, pulisci_testo(testo_note), align="C")
 
-                        # DISCLAIMER E FOOTER
-                        pdf.ln(4)
+                        # --- FIX: DISCLAIMER E FOOTER ANCORATI AL FONDO ---
+                        pdf.set_y(265)
                         pdf.set_font(pdf.f_f, "I", 7)
                         pdf.set_text_color(180, 180, 180)
                         pdf.multi_cell(0, 3, f"*Le immagini sono puramente indicative e non costituiscono vincolo contrattuale.\n*ATTENZIONE: il canone indicato non comprende la tassa automobilistica, da gennaio 2020 a carico del cliente per modifica di legge (D.L. 124/2019).\n*Validità offerta: {g_validita} giorni.", align="C")
                         
-                        pdf.set_y(255); pdf.set_font(pdf.f_f, "B", 10); pdf.set_text_color(255, 255, 255)
+                        pdf.set_y(280)
+                        pdf.set_font(pdf.f_f, "B", 10)
+                        pdf.set_text_color(255, 255, 255)
                         pdf.cell(0, 5, f"CONSULENTE: {nome_cons.upper()}", align="C", ln=True)
-                        pdf.set_font(pdf.f_f, "", 9); pdf.set_text_color(200, 200, 200)
+                        pdf.set_font(pdf.f_f, "", 9)
+                        pdf.set_text_color(200, 200, 200)
                         pdf.cell(0, 5, f"E-mail: {email_cons}  |  Tel: {tel_cons}", align="C", ln=True)
 
                     pdf.output("preventivo_multiplo.pdf")
