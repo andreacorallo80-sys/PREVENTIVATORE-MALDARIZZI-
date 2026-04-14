@@ -15,7 +15,7 @@ if not os.path.exists("Foto_Cache"):
     os.makedirs("Foto_Cache")
 
 # --- HELPER LETTURA FILE ---
-def leggi_file_dati(percorso):
+def leggi_file_dati(percorso): 
     if percorso.endswith(".csv"):
         try:
             df = pd.read_csv(percorso, sep=";", on_bad_lines='skip')
